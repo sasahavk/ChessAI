@@ -5,8 +5,11 @@ making a minimax w alphabeta pruning model, start with one depth (maybe depth = 
 
 ## Teammate:
 DK
+
 yash
+
 Tianrun
+
 
 ## To do:
 finish our model before 11/8

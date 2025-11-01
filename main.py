@@ -32,6 +32,7 @@ class ChessAI:
         self.font = None
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.board = chess.Board()
+        # download Stockfish and update path to your local abs/rel path
         self.engine = chess.engine.SimpleEngine.popen_uci(
             r"C:\Users\sasaa\OneDrive\Documents\GOLANG\src\MyVault\NOTES\UC-Davis\F25\ECS170\stockfish\stockfish-windows-x86-64-avx2.exe")
 

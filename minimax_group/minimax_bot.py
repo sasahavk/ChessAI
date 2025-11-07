@@ -1,5 +1,13 @@
 import chess
 import math
+try:
+    from .evaluate import evaluate
+except ImportError:
+    # Fallback for when running as a script
+    try:
+        from evaluate import evaluate
+    except ImportError:
+        evaluate = None
 
 
 class MinimaxBot:
@@ -118,11 +126,17 @@ class MinimaxBot:
         Returns score from the perspective of the side to move.
         Positive scores favor the side to move, negative scores favor the opponent.
         
-        Evaluation considers:
+        Uses the comprehensive evaluation function from evaluate.py if available, which considers:
         - Material value (piece values)
         - Piece-square tables (positional value)
+        - Pawn structure
+        - Bishop pairs
+        - Knight outposts
+        - Rook files
         - King safety
-        - Center control
+        - Mobility
+        
+        Falls back to simple material evaluation if evaluate.py is not available.
         
         Args:
             board (chess.Board): The board to evaluate
@@ -139,98 +153,44 @@ class MinimaxBot:
         if board.is_insufficient_material():
             return 0
         
-        # Evaluate from white's perspective first
-        white_score = 0
-        
-        # Piece values
-        piece_values = {
-            chess.PAWN: 100,
-            chess.KNIGHT: 320,
-            chess.BISHOP: 330,
-            chess.ROOK: 500,
-            chess.QUEEN: 900,
-            chess.KING: 20000
-        }
-        
-        # Piece-square tables for positional evaluation
-        # Values encourage pieces to be in good positions
-        pawn_table = [
-            0,  0,  0,  0,  0,  0,  0,  0,
-            50, 50, 50, 50, 50, 50, 50, 50,
-            10, 10, 20, 30, 30, 20, 10, 10,
-            5,  5, 10, 25, 25, 10,  5,  5,
-            0,  0,  0, 20, 20,  0,  0,  0,
-            5, -5,-10,  0,  0,-10, -5,  5,
-            5, 10, 10,-20,-20, 10, 10,  5,
-            0,  0,  0,  0,  0,  0,  0,  0
-        ]
-        
-        knight_table = [
-            -50,-40,-30,-30,-30,-30,-40,-50,
-            -40,-20,  0,  0,  0,  0,-20,-40,
-            -30,  0, 10, 15, 15, 10,  0,-30,
-            -30,  5, 15, 20, 20, 15,  5,-30,
-            -30,  0, 15, 20, 20, 15,  0,-30,
-            -30,  5, 10, 15, 15, 10,  5,-30,
-            -40,-20,  0,  5,  5,  0,-20,-40,
-            -50,-40,-30,-30,-30,-30,-40,-50
-        ]
-        
-        # Evaluate material and position for each piece
-        for square in chess.SQUARES:
-            piece = board.piece_at(square)
-            if piece is None:
-                continue
+        # Use the comprehensive evaluation function from evaluate.py if available
+        if evaluate is not None:
+            # It returns score from white's perspective
+            white_score = evaluate(board)
             
-            # Material value
-            piece_value = piece_values[piece.piece_type]
-            
-            # Positional value
-            positional_value = 0
-            if piece.piece_type == chess.PAWN:
-                # Flip table for black pieces
-                table_index = square if piece.color == chess.WHITE else 63 - square
-                positional_value = pawn_table[table_index]
-            elif piece.piece_type == chess.KNIGHT:
-                table_index = square if piece.color == chess.WHITE else 63 - square
-                positional_value = knight_table[table_index]
-            
-            # Add to white's score (positive for white, negative for black)
-            if piece.color == chess.WHITE:
-                white_score += piece_value + positional_value
+            # Return score from the perspective of the side to move
+            # If it's white's turn, return white_score (positive = good for white)
+            # If it's black's turn, return -white_score (positive = good for black)
+            if board.turn == chess.WHITE:
+                return white_score
             else:
-                white_score -= piece_value + positional_value
-        
-        # Bonus for controlling center squares
-        center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
-        for square in center_squares:
-            if board.piece_at(square):
-                piece = board.piece_at(square)
-                if piece.color == chess.WHITE:
-                    white_score += 20
-                else:
-                    white_score -= 20
-        
-        # King safety: penalty for exposed king
-        white_king_square = board.king(chess.WHITE)
-        black_king_square = board.king(chess.BLACK)
-        
-        if white_king_square is not None:
-            # Penalize if king is in center in opening/midgame
-            if chess.square_rank(white_king_square) > 1:
-                white_score -= 10
-        
-        if black_king_square is not None:
-            if chess.square_rank(black_king_square) < 6:
-                white_score += 10
-        
-        # Return score from the perspective of the side to move
-        # If it's white's turn, return white_score (positive = good for white)
-        # If it's black's turn, return -white_score (positive = good for black)
-        if board.turn == chess.WHITE:
-            return white_score
+                return -white_score
         else:
-            return -white_score
+            # Fallback: simple material evaluation
+            piece_values = {
+                chess.PAWN: 100,
+                chess.KNIGHT: 320,
+                chess.BISHOP: 330,
+                chess.ROOK: 500,
+                chess.QUEEN: 900,
+                chess.KING: 0
+            }
+            
+            score = 0
+            for square in chess.SQUARES:
+                piece = board.piece_at(square)
+                if piece:
+                    value = piece_values[piece.piece_type]
+                    if piece.color == chess.WHITE:
+                        score += value
+                    else:
+                        score -= value
+            
+            # Return score from the perspective of the side to move
+            if board.turn == chess.WHITE:
+                return score
+            else:
+                return -score
 
 
 # Example usage and testing

@@ -1,5 +1,5 @@
 import chess
-
+# NOTE: Weights here are NOT fully fine tuned - minimal testing
 # These represent the traditonal centipawn values of the pieces in chess
 piece_values = {
     chess.PAWN: 100,

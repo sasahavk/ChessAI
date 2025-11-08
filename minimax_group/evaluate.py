@@ -311,7 +311,7 @@ def evaluate(board: chess.Board) -> int:
 
     score = 0
     score += w_material * evaluate_material(board)                              # material is static
-    score += w_pst * (0.6 + 0.4 * phase) * evaluate_piece_square_tables(board)  # scale by phase
+    score += w_pst * (0.3 + 0.7 * phase) * evaluate_piece_square_tables(board)  # scale by phase
     score += w_pawn_structure * evaluate_pawn_structure(board)                  # static enough
     score += w_bishop_pair * evaluate_bishop_pair(board)                        # usually static
     score += w_knight_outposts * evaluate_knight_outposts(board)                # static enough

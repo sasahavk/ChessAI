@@ -248,10 +248,7 @@ def phase(board: chess.Board) -> float:
     return game_phase(board)
 
 def evaluate_king(board: chess.Board) -> int:
- 
-    # Safety of the king is highly variable depending on the phase of the game
-
-    phase = game_phase(board) 
+    phase = game_phase(board)
     score = 0
 
     for color in [chess.WHITE, chess.BLACK]:
@@ -260,15 +257,18 @@ def evaluate_king(board: chess.Board) -> int:
 
         # Middle game
         safety_score = 0
-        # Pawn shield
         pawn_dir = 1 if color == chess.WHITE else -1
-        for df in [-1,0,1]:
+
+        # Gradual ramp-up for pawn shield bonus
+        ramp_factor = min(board.fullmove_number / 5, 1.0)  # goes from 0 to 1 over first 5 moves
+        for df in [-1, 0, 1]:
             r = kr + pawn_dir
             f = kf + df
             if 0 <= r <= 7 and 0 <= f <= 7:
                 p = board.piece_at(chess.square(f,r))
                 if p and p.piece_type == chess.PAWN and p.color == color:
-                    safety_score += 10
+                    safety_score += 10 * ramp_factor
+
         # Enemy proximity
         danger = 0
         for sq in chess.SQUARES:
@@ -327,9 +327,9 @@ def evaluate(board: chess.Board) -> int:
     w_bishop_pair = 0.2
     w_knight_outposts = 0.3
     w_rook_files = 0.2
-    w_king_safety = 0.9
+    w_king_safety = 0.7
     w_mobility = 0.3
-    w_center = 0.15
+    w_center = 0.22
 
     score = 0
     score += w_material * evaluate_material(board)                              # material is static

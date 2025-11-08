@@ -289,30 +289,38 @@ def evaluate_king(board: chess.Board) -> int:
     return score
 
 def evaluate_mobility(board: chess.Board) -> int:
-    piece_weights = {
-        chess.PAWN: 1,
-        chess.KNIGHT: 3,
-        chess.BISHOP: 3,
-        chess.ROOK: 5,
-        chess.QUEEN: 9,
-        chess.KING: 0
-    }
-
-    center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
-
     white_score = 0
     black_score = 0
+    center = [chess.D4, chess.E4, chess.D5, chess.E5]
 
     for move in board.legal_moves:
         piece = board.piece_at(move.from_square)
         if not piece:
             continue
 
-        weight = piece_weights[piece.piece_type]
+        # base mobility weight
+        weight = 0
+        if piece.piece_type == chess.PAWN:
+            # advance + center bonus
+            rank = chess.square_rank(move.to_square)
+            if piece.color == chess.WHITE:
+                weight = 6 + (rank * 2)  # advancing 2nd rank gives small bonus, central rank bigger
+            else:
+                weight = 6 + ((7 - rank) * 2)
+        elif piece.piece_type == chess.KNIGHT:
+            weight = 7
+        elif piece.piece_type == chess.BISHOP:
+            weight = 7
+        elif piece.piece_type == chess.ROOK:
+            weight = 6
+        elif piece.piece_type == chess.QUEEN:
+            weight = 10
+        else:
+            weight = 0
 
-        # Extra weight if moving toward center
-        if move.to_square in center_squares:
-            weight += 2
+        # extra +5 for moving to central squares
+        if move.to_square in center:
+            weight += 5
 
         if piece.color == chess.WHITE:
             white_score += weight

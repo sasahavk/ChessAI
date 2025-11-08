@@ -304,12 +304,12 @@ def evaluate_center_control(board):
         if piece:
             if piece.color == chess.WHITE:
                 if piece.piece_type == chess.PAWN:
-                    score += 45
+                    score += 50
                 else:
                     score += 15
             else:
                 if piece.piece_type == chess.PAWN:
-                    score -= 45
+                    score -= 50
                 else:
                     score -= 15
 

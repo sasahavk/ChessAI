@@ -304,13 +304,13 @@ def evaluate_mobility(board: chess.Board) -> int:
             # advance + center bonus
             rank = chess.square_rank(move.to_square)
             if piece.color == chess.WHITE:
-                weight = 6 + (rank * 2)  # advancing 2nd rank gives small bonus, central rank bigger
+                weight = 7 + (rank * 2)  # advancing 2nd rank gives small bonus, central rank bigger
             else:
                 weight = 6 + ((7 - rank) * 2)
         elif piece.piece_type == chess.KNIGHT:
-            weight = 7
+            weight = 6
         elif piece.piece_type == chess.BISHOP:
-            weight = 7
+            weight = 6
         elif piece.piece_type == chess.ROOK:
             weight = 6
         elif piece.piece_type == chess.QUEEN:
@@ -319,7 +319,7 @@ def evaluate_mobility(board: chess.Board) -> int:
             weight = 0
 
         # extra +5 for moving to central squares
-        if move.to_square in center:
+        if move.to_square in center and piece.piece_type = chess.PAWN:
             weight += 5
 
         if piece.color == chess.WHITE:

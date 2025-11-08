@@ -319,7 +319,7 @@ def evaluate_mobility(board: chess.Board) -> int:
             weight = 0
 
         # extra +5 for moving to central squares
-        if move.to_square in center and piece.piece_type = chess.PAWN:
+        if move.to_square in center and piece.piece_type == chess.PAWN:
             weight += 5
 
         if piece.color == chess.WHITE:

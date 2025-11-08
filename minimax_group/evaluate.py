@@ -289,11 +289,38 @@ def evaluate_king(board: chess.Board) -> int:
     return score
 
 def evaluate_mobility(board: chess.Board) -> int:
-    white_moves = board.legal_moves.count()
-    board.push(chess.Move.null())
-    black_moves = board.legal_moves.count()
-    board.pop()
-    return white_moves - black_moves
+    piece_weights = {
+        chess.PAWN: 1,
+        chess.KNIGHT: 3,
+        chess.BISHOP: 3,
+        chess.ROOK: 5,
+        chess.QUEEN: 9,
+        chess.KING: 0
+    }
+
+    center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
+
+    white_score = 0
+    black_score = 0
+
+    for move in board.legal_moves:
+        piece = board.piece_at(move.from_square)
+        if not piece:
+            continue
+
+        weight = piece_weights[piece.piece_type]
+
+        # Extra weight if moving toward center
+        if move.to_square in center_squares:
+            weight += 2
+
+        if piece.color == chess.WHITE:
+            white_score += weight
+        else:
+            black_score += weight
+
+    return white_score - black_score
+
     
 def evaluate_center_control(board):
     score = 0
@@ -304,12 +331,12 @@ def evaluate_center_control(board):
         if piece:
             if piece.color == chess.WHITE:
                 if piece.piece_type == chess.PAWN:
-                    score += 50
+                    score += 60
                 else:
                     score += 15
             else:
                 if piece.piece_type == chess.PAWN:
-                    score -= 50
+                    score -= 60
                 else:
                     score -= 15
 
@@ -327,9 +354,9 @@ def evaluate(board: chess.Board) -> int:
     w_bishop_pair = 0.2
     w_knight_outposts = 0.3
     w_rook_files = 0.2
-    w_king_safety = 0.65
+    w_king_safety = 0.6
     w_mobility = 0.3
-    w_center = 0.28
+    w_center = 0.35
 
     score = 0
     score += w_material * evaluate_material(board)                              # material is static

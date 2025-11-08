@@ -13,18 +13,29 @@ PIECE_VALUE = {
 }
 
 def material_balance(board: chess.Board):
-    score = 0
+    scores = []
+    side = 1
+    if board.turn == chess.BLACK: side = -1
     for piece_type, v in PIECE_VALUE.items():
-        score += v * (len(board.pieces(piece_type, chess.WHITE)) - len(board.pieces(piece_type, chess.BLACK)))
-    if board.turn == chess.BLACK: score *= -1
-    return score
+        if piece_type != chess.KING:
+            scores.append(side * v * (len(board.pieces(piece_type, chess.WHITE)) - len(board.pieces(piece_type, chess.BLACK))))
+    return scores
+
+def mobility_one_side(board: chess.Board):
+    scores = [0] * 6
+    for move in list(board.legal_moves):
+        piece = board.piece_at(move.from_square)
+        if piece: scores[piece.piece_type - 1] += 1
+    return scores
 
 def mobility(board: chess.Board):
-    score = board.legal_moves.count()
+    scores = mobility_one_side(board)
     board.push(chess.Move.null())
-    score -= board.legal_moves.count()
+    scores_other = mobility_one_side(board)
     board.pop()
-    return score
+    for i in range(len(scores)):
+        scores[i] -= scores_other[i]
+    return scores
 
 def encode_result_for_side(final_result: str, side_to_move: int) -> int:
     if final_result in ("1/2-1/2", "*"): return 1
@@ -46,7 +57,11 @@ def main():
 
     with open(OUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["board", "turn", "move_num", "result", "material_balance", "mobility"])
+        writer.writerow([
+            "board", "turn", "move_num", "result",
+            "material_balance_pawn", "material_balance_knight", "material_balance_bishop", "material_balance_rook", "material_balance_queen",
+            "mobility_pawn", "mobility_knight", "mobility_bishop", "mobility_rook", "mobility_queen", "mobility_king"
+        ])
         try:
             while total_rows < TARGET_ROWS:
                 board = chess.Board()
@@ -58,7 +73,7 @@ def main():
                     move_num = min(board.fullmove_number, 60)
                     material_balance_v = material_balance(board)
                     mobility_v = mobility(board)
-                    game_rows.append([state, turn, move_num, None, material_balance_v, mobility_v])
+                    game_rows.append([state, turn, move_num, None] + material_balance_v + mobility_v)
                     result = engine.play(board, chess.engine.Limit(time=0.01))
                     if result.move is None:
                         break
@@ -74,4 +89,4 @@ def main():
         finally:
             engine.quit()
 
-main()
+if __name__ == "__main__": main()

@@ -294,30 +294,41 @@ def evaluate_mobility(board: chess.Board) -> int:
     black_moves = board.legal_moves.count()
     board.pop()
     return white_moves - black_moves
+    
+def evaluate_center_control(board):
+    center = [chess.E4, chess.D4, chess.E5, chess.D5]
+    score = 0
+    for square in center:
+        score += len(board.attackers(chess.WHITE, square)) * 12
+        score -= len(board.attackers(chess.BLACK, square)) * 12
+    return score
 
 # Final calculation function, summation of each score * weight 
 def evaluate(board: chess.Board) -> int:
+    # Game Phase
+    phase_value = game_phase(board) 
+    
     # weights (not tested, used off of personal experience and intuition)
     w_material = 1.0
-    w_pst = 0.4
+    w_pst = (0.3 + 0.7 * phase_value)
     w_pawn_structure = 0.4
     w_bishop_pair = 0.2
     w_knight_outposts = 0.3
     w_rook_files = 0.2
-    w_king_safety = 1.2
+    w_king_safety = 0.9
     w_mobility = 0.3
-
-    phase = game_phase(board) 
+    w_center = 0.15
 
     score = 0
     score += w_material * evaluate_material(board)                              # material is static
-    score += w_pst * (0.3 + 0.7 * phase) * evaluate_piece_square_tables(board)  # scale by phase
+    score += w_pst * evaluate_piece_square_tables(board)                        # scale by phase
     score += w_pawn_structure * evaluate_pawn_structure(board)                  # static enough
     score += w_bishop_pair * evaluate_bishop_pair(board)                        # usually static
     score += w_knight_outposts * evaluate_knight_outposts(board)                # static enough
     score += w_rook_files * evaluate_rook_files(board)                          # static enough
-    score += w_king_safety * phase * evaluate_king(board)                       # king safety less important in endgame
-    score += w_mobility * evaluate_mobility(board)                              # mobility matters more in endgame
+    score += w_king_safety * evaluate_king(board)                               # king safety changes entirely in endgame
+    score += w_mobility * phase_value * evaluate_mobility(board)                # mobility matters more in middlegame
+    score += w_center * evaluate_center_control(board)                          # At start, focus on moving pawns to the middle
 
     # Small tempo bonus
     if board.turn == chess.WHITE:

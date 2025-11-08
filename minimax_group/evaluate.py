@@ -296,11 +296,23 @@ def evaluate_mobility(board: chess.Board) -> int:
     return white_moves - black_moves
     
 def evaluate_center_control(board):
-    center = [chess.E4, chess.D4, chess.E5, chess.D5]
     score = 0
-    for square in center:
-        score += len(board.attackers(chess.WHITE, square)) * 12
-        score -= len(board.attackers(chess.BLACK, square)) * 12
+    center = [chess.E4, chess.D4, chess.E5, chess.D5]
+
+    for sq in center:
+        piece = board.piece_at(sq)
+        if piece:
+            if piece.color == chess.WHITE:
+                if piece.piece_type == chess.PAWN:
+                    score += 45
+                else:
+                    score += 15
+            else:
+                if piece.piece_type == chess.PAWN:
+                    score -= 45
+                else:
+                    score -= 15
+
     return score
 
 # Final calculation function, summation of each score * weight 

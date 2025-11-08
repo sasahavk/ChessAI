@@ -327,7 +327,7 @@ def evaluate(board: chess.Board) -> int:
     w_bishop_pair = 0.2
     w_knight_outposts = 0.3
     w_rook_files = 0.2
-    w_king_safety = 0.7
+    w_king_safety = 0.65
     w_mobility = 0.3
     w_center = 0.28
 

@@ -364,7 +364,7 @@ def evaluate(board: chess.Board) -> int:
     w_rook_files = 0.2
     w_king_safety = 0.6
     w_mobility = 0.3
-    w_center = 0.35
+    w_center = 0.38
 
     score = 0
     score += w_material * evaluate_material(board)                              # material is static

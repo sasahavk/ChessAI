@@ -301,14 +301,19 @@ def evaluate_mobility(board: chess.Board) -> int:
         # base mobility weight
         weight = 0
         if piece.piece_type == chess.PAWN:
-            # advance + center bonus
             rank = chess.square_rank(move.to_square)
             if piece.color == chess.WHITE:
-                weight = 7 + (rank * 2)  # advancing 2nd rank gives small bonus, central rank bigger
+                weight = 7 + (rank * 2)
             else:
                 weight = 6 + ((7 - rank) * 2)
+            # extra +15 for moving to central squares (pawn)
+            if move.to_square in center:
+                weight += 15
         elif piece.piece_type == chess.KNIGHT:
-            weight = 6
+            weight = 4
+            # penalty for knights in the opening (move 1)
+            if board.fullmove_number == 1:
+                weight -= 5  # small penalty for Nf3/Nc3
         elif piece.piece_type == chess.BISHOP:
             weight = 6
         elif piece.piece_type == chess.ROOK:
@@ -317,10 +322,6 @@ def evaluate_mobility(board: chess.Board) -> int:
             weight = 10
         else:
             weight = 0
-
-        # extra +5 for moving to central squares
-        if move.to_square in center and piece.piece_type == chess.PAWN:
-            weight += 5
 
         if piece.color == chess.WHITE:
             white_score += weight
@@ -339,12 +340,12 @@ def evaluate_center_control(board):
         if piece:
             if piece.color == chess.WHITE:
                 if piece.piece_type == chess.PAWN:
-                    score += 60
+                    score += 80
                 else:
                     score += 15
             else:
                 if piece.piece_type == chess.PAWN:
-                    score -= 60
+                    score -= 80
                 else:
                     score -= 15
 

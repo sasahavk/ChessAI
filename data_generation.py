@@ -1,41 +1,8 @@
-import csv, os, chess, chess.engine
+import random, csv, os, chess, chess.engine
+from feature_extractor_material import MaterialFeatureExtractor
 
 OUT_CSV = ""
-TARGET_ROWS = 33000
-
-PIECE_VALUE = {
-    chess.PAWN: 1,
-    chess.KNIGHT: 3,
-    chess.BISHOP: 3,
-    chess.ROOK: 5,
-    chess.QUEEN: 9,
-    chess.KING: 0,
-}
-
-def material_balance(board: chess.Board):
-    scores = []
-    side = 1
-    if board.turn == chess.BLACK: side = -1
-    for piece_type, v in PIECE_VALUE.items():
-        if piece_type != chess.KING:
-            scores.append(side * v * (len(board.pieces(piece_type, chess.WHITE)) - len(board.pieces(piece_type, chess.BLACK))))
-    return scores
-
-def mobility_one_side(board: chess.Board):
-    scores = [0] * 6
-    for move in list(board.legal_moves):
-        piece = board.piece_at(move.from_square)
-        if piece: scores[piece.piece_type - 1] += 1
-    return scores
-
-def mobility(board: chess.Board):
-    scores = mobility_one_side(board)
-    board.push(chess.Move.null())
-    scores_other = mobility_one_side(board)
-    board.pop()
-    for i in range(len(scores)):
-        scores[i] -= scores_other[i]
-    return scores
+TARGET_ROWS = 33
 
 def encode_result_for_side(final_result: str, side_to_move: int) -> int:
     if final_result in ("1/2-1/2", "*"): return 1
@@ -51,17 +18,12 @@ def main():
     os.makedirs(os.path.dirname(OUT_CSV) or ".", exist_ok=True)
     engine = chess.engine.SimpleEngine.popen_uci(r"C:\cs\stockfish\stockfish-windows-x86-64-avx2.exe")
     engine.configure({
-        "Skill Level": 2,
+        "Skill Level": random.randint(0, 20),
     })
     total_rows, games = 0, 0
 
     with open(OUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            "board", "turn", "move_num", "result",
-            "material_balance_pawn", "material_balance_knight", "material_balance_bishop", "material_balance_rook", "material_balance_queen",
-            "mobility_pawn", "mobility_knight", "mobility_bishop", "mobility_rook", "mobility_queen", "mobility_king"
-        ])
         try:
             while total_rows < TARGET_ROWS:
                 board = chess.Board()
@@ -71,9 +33,8 @@ def main():
                     state = board.fen()
                     turn = int(board.turn)
                     move_num = min(board.fullmove_number, 60)
-                    material_balance_v = material_balance(board)
-                    mobility_v = mobility(board)
-                    game_rows.append([state, turn, move_num, None] + material_balance_v + mobility_v)
+                    features = MaterialFeatureExtractor(board, int(board.fullmove_number / 20)).extract_features()
+                    game_rows.append([state, turn, move_num, None] + features)
                     result = engine.play(board, chess.engine.Limit(time=0.01))
                     if result.move is None:
                         break

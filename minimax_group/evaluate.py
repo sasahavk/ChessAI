@@ -209,8 +209,6 @@ def evaluate_rook_files(board: chess.Board) -> int:
 
     return score
 
-import chess
-
 def evaluate_knight_outposts(board: chess.Board) -> int:
     score = 0
 

@@ -248,10 +248,7 @@ def phase(board: chess.Board) -> float:
     return game_phase(board)
 
 def evaluate_king(board: chess.Board) -> int:
- 
-    # Safety of the king is highly variable depending on the phase of the game
-
-    phase = game_phase(board) 
+    phase = game_phase(board)
     score = 0
 
     for color in [chess.WHITE, chess.BLACK]:
@@ -260,15 +257,18 @@ def evaluate_king(board: chess.Board) -> int:
 
         # Middle game
         safety_score = 0
-        # Pawn shield
         pawn_dir = 1 if color == chess.WHITE else -1
-        for df in [-1,0,1]:
+
+        # Gradual ramp-up for pawn shield bonus
+        ramp_factor = min(board.fullmove_number / 5, 1.0)  # goes from 0 to 1 over first 5 moves
+        for df in [-1, 0, 1]:
             r = kr + pawn_dir
             f = kf + df
             if 0 <= r <= 7 and 0 <= f <= 7:
                 p = board.piece_at(chess.square(f,r))
                 if p and p.piece_type == chess.PAWN and p.color == color:
-                    safety_score += 10
+                    safety_score += 10 * ramp_factor
+
         # Enemy proximity
         danger = 0
         for sq in chess.SQUARES:
@@ -289,35 +289,94 @@ def evaluate_king(board: chess.Board) -> int:
     return score
 
 def evaluate_mobility(board: chess.Board) -> int:
-    white_moves = board.legal_moves.count()
-    board.push(chess.Move.null())
-    black_moves = board.legal_moves.count()
-    board.pop()
-    return white_moves - black_moves
+    white_score = 0
+    black_score = 0
+    center = [chess.D4, chess.E4, chess.D5, chess.E5]
+
+    for move in board.legal_moves:
+        piece = board.piece_at(move.from_square)
+        if not piece:
+            continue
+
+        # base mobility weight
+        weight = 0
+        if piece.piece_type == chess.PAWN:
+            rank = chess.square_rank(move.to_square)
+            if piece.color == chess.WHITE:
+                weight = 7 + (rank * 2)
+            else:
+                weight = 6 + ((7 - rank) * 2)
+            # extra +15 for moving to central squares (pawn)
+            if move.to_square in center:
+                weight += 15
+        elif piece.piece_type == chess.KNIGHT:
+            weight = 4
+            # penalty for knights in the opening (move 1)
+            if board.fullmove_number == 1:
+                weight -= 5  # small penalty for Nf3/Nc3
+        elif piece.piece_type == chess.BISHOP:
+            weight = 6
+        elif piece.piece_type == chess.ROOK:
+            weight = 6
+        elif piece.piece_type == chess.QUEEN:
+            weight = 10
+        else:
+            weight = 0
+
+        if piece.color == chess.WHITE:
+            white_score += weight
+        else:
+            black_score += weight
+
+    return white_score - black_score
+
+    
+def evaluate_center_control(board):
+    score = 0
+    center = [chess.E4, chess.D4, chess.E5, chess.D5]
+
+    for sq in center:
+        piece = board.piece_at(sq)
+        if piece:
+            if piece.color == chess.WHITE:
+                if piece.piece_type == chess.PAWN:
+                    score += 80
+                else:
+                    score += 15
+            else:
+                if piece.piece_type == chess.PAWN:
+                    score -= 80
+                else:
+                    score -= 15
+
+    return score
 
 # Final calculation function, summation of each score * weight 
 def evaluate(board: chess.Board) -> int:
+    # Game Phase
+    phase_value = game_phase(board) 
+    
     # weights (not tested, used off of personal experience and intuition)
     w_material = 1.0
-    w_pst = 0.4
+    w_pst = (0.3 + 0.7 * phase_value)
     w_pawn_structure = 0.4
     w_bishop_pair = 0.2
     w_knight_outposts = 0.3
     w_rook_files = 0.2
-    w_king_safety = 1.2
+    w_king_safety = 0.6
     w_mobility = 0.3
-
-    phase = game_phase(board) 
+    w_center = 0.38
 
     score = 0
     score += w_material * evaluate_material(board)                              # material is static
-    score += w_pst * (0.6 + 0.4 * phase) * evaluate_piece_square_tables(board)  # scale by phase
+    score += w_pst * evaluate_piece_square_tables(board)                        # scale by phase
     score += w_pawn_structure * evaluate_pawn_structure(board)                  # static enough
     score += w_bishop_pair * evaluate_bishop_pair(board)                        # usually static
     score += w_knight_outposts * evaluate_knight_outposts(board)                # static enough
     score += w_rook_files * evaluate_rook_files(board)                          # static enough
-    score += w_king_safety * phase * evaluate_king(board)                       # king safety less important in endgame
-    score += w_mobility * evaluate_mobility(board)                              # mobility matters more in endgame
+    score += w_king_safety * evaluate_king(board)                               # king safety changes entirely in endgame
+    score += w_mobility * phase_value * evaluate_mobility(board)                # mobility matters more in middlegame
+    score += w_center * evaluate_center_control(board)                          # At start, focus on moving pawns to the middle
 
     # Small tempo bonus
     if board.turn == chess.WHITE:

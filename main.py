@@ -1,186 +1,377 @@
-import time
-import pygame, chess
+# main.py
+import pygame
+import chess
 import chess.engine
-import asyncio
 
-# colors
-WHITE = pygame.Color(255, 255, 255)
-BLACK = pygame.Color(0, 0, 0)
-LIGHT_SQUARE = pygame.Color(240, 217, 181)
-DARK_SQUARE = pygame.Color(181, 136, 99)
-HIGHLIGHT = pygame.Color(255, 255, 0, 100)
+from minimax_group.minimax_bot import MinimaxBot
+from minimax_group.evaluate import evaluate
 
-WIDTH = 400
-HEIGHT = 400
-W = H =50
+TILE = 50
+WIDTH = HEIGHT = TILE * 8
+
+WHITE_RGB = (255, 255, 255)
+BLACK_RGB = (0, 0, 0)
+LIGHT_SQ = (240, 217, 181)
+DARK_SQ = (181, 136, 99)
+HILITE_RGBA = (255, 255, 0, 90)
+
+FONT_NAME = "segoeuisymbol"
+FONT_SIZE = 36
+
+# Stockfish: set path when you’re ready
+STOCKFISH_PATH = r""
+STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
+
+# How long to display result screen (ms)
+RESULT_DISPLAY_MS = 2500
 
 
-def get_square(x, y):
-    f = x // W
-    r = 7 - (y // H)
-    return chess.square(f, r)
+def get_square_from_xy(x: int, y: int) -> chess.Square:
+    """Convert screen (x,y) to chess.Square (0..63), with rank 7 at top row."""
+    file_ = x // TILE
+    rank_ = 7 - (y // TILE)
+    return chess.square(file_, rank_)
 
 
-class ChessAI:
-    def __init__(self, p1, p2):
-        self.p1 = p1
-        self.p2 = p2
-        self.current_sqr = None
-        self.has_selected = False
-        self.highlighted_sqrs = []
-        self.running = True
-        self.font = None
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+class ChessGame:
+    """
+    Side strings:
+      - "human": clicks
+      - "minimax": our Python Minimax
+      - "stockfish": external engine (if STOCKFISH_PATH is set)
+    """
+    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4):
+        self.white_player = white_player
+        self.black_player = black_player
+
         self.board = chess.Board()
-        # download Stockfish and update path to your local abs/rel path
-        self.engine = chess.engine.SimpleEngine.popen_uci(
-            r"C:\Users\sasaa\OneDrive\Documents\GOLANG\src\MyVault\NOTES\UC-Davis\F25\ECS170\stockfish\stockfish-windows-x86-64-avx2.exe")
+        self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
 
-        self.board_array = [[None for _ in range(8)] for _ in range(8)]
-        for square in range(64):
-            piece = self.board.piece_at(square)
-            if piece:
-                self.board_array[7 - chess.square_rank(square)][chess.square_file(square)] = piece
+        self.screen = None
+        self.font = None
+        self.running = True
+
+        self.has_selected = False
+        self.current_sqr = None
+        self.highlighted_sqrs = []
+
+        self.highlight_layer = None
+
+        self.engine = None
+        if self.white_player == "stockfish" or self.black_player == "stockfish":
+            if STOCKFISH_PATH:
+                try:
+                    self.engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+                except Exception as e:
+                    print(f"[WARN] Could not start Stockfish: {e}")
+                    self.engine = None
+            else:
+                print("[INFO] STOCKFISH_PATH not set; Stockfish disabled for this run.")
 
     def draw_board(self):
-        color = 0
-        for i in range(8):
-            t = 50 * i
-            if i % 2 == 0:
-                first_sq_color = LIGHT_SQUARE
-            else:
-                first_sq_color = DARK_SQUARE
-            for j in range(8):
-                l = 50 * j
-                if j == 0:
-                    color = first_sq_color
-                else:
-                    if color == LIGHT_SQUARE:
-                        color = DARK_SQUARE
-                    else:
-                        color = LIGHT_SQUARE
-                pygame.draw.rect(self.screen, color=color, rect=pygame.Rect(t, l, W, H))
+        for r in range(8):
+            for f in range(8):
+                # flip rank index for color so a1 is dark
+                color = DARK_SQ if (r + f) % 2 == 0 else LIGHT_SQ
+                pygame.draw.rect(
+                    self.screen,
+                    color,
+                    pygame.Rect(f * TILE, (7 - r) * TILE, TILE, TILE),
+                )
 
-    def draw_pieces(self):
-        for i in range(8):
-            for j in range(8):
-                piece = self.board_array[i][j]
-                if not piece:
-                    continue
-                color = WHITE
-                if piece.color == chess.BLACK:
-                    color = BLACK
-                text_surface = self.font.render(piece.unicode_symbol(), True, color)
-                text_rect = text_surface.get_rect(center=(W // 2 + W * j, H // 2 + H * i))
-                self.screen.blit(text_surface, text_rect)
+    def draw_pieces_from_board(self):
+        for sq in chess.SQUARES:
+            piece = self.board.piece_at(sq)
+            if not piece:
+                continue
+            color = WHITE_RGB if piece.color == chess.WHITE else BLACK_RGB
+            r = chess.square_rank(sq)
+            f = chess.square_file(sq)
+            glyph = piece.unicode_symbol()
+            text_surface = self.font.render(glyph, True, color)
+            cx = TILE // 2 + TILE * f
+            cy = TILE // 2 + TILE * (7 - r)
+            rect = text_surface.get_rect(center=(cx, cy))
+            self.screen.blit(text_surface, rect)
 
-    def update_square(self, sqr):
-        r = chess.square_rank(sqr)
-        f = chess.square_file(sqr)
-        color = None
-        if (7 - r) % 2 == 0:
-            if f % 2 == 0:
-                color = LIGHT_SQUARE
+    def draw_highlights(self):
+        self.highlight_layer.fill((0, 0, 0, 0))
+        for sq in self.highlighted_sqrs:
+            r = chess.square_rank(sq)
+            f = chess.square_file(sq)
+            pygame.draw.rect(
+                self.highlight_layer,
+                HILITE_RGBA,
+                pygame.Rect(f * TILE, (7 - r) * TILE, TILE, TILE),
+            )
+        self.screen.blit(self.highlight_layer, (0, 0))
+
+    def get_result_text(self) -> str:
+        if self.board.is_checkmate():
+            # side-to-move is checkmated
+            winner = "Black" if self.board.turn == chess.WHITE else "White"
+            return f"Checkmate — {winner} wins"
+        # other draw types
+        if self.board.is_stalemate():
+            return "Draw — stalemate"
+        outcome = self.board.outcome()
+        if outcome and outcome.termination:
+            if outcome.winner is None:
+                return "Draw"
+            return f"{'White' if outcome.winner else 'Black'} wins"
+        return "Game over"
+
+    def show_center_banner(self, text: str):
+        """Render a centered banner text."""
+        label = pygame.font.SysFont("arial", 28, bold=True).render(text, True, (30, 30, 30))
+        rect = label.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        # semi-transparent backdrop
+        backdrop = pygame.Surface((rect.width + 20, rect.height + 12), pygame.SRCALPHA)
+        backdrop.fill((255, 255, 255, 210))
+        brect = backdrop.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        self.screen.blit(backdrop, brect)
+        self.screen.blit(label, rect)
+
+    def choose_promotion(self, to_square: chess.Square, allowed_types: list[int]) -> int | None:
+        """
+        Modal mini-UI to choose promotion piece for the human.
+        allowed_types is a list of piece types among {QUEEN, ROOK, BISHOP, KNIGHT}
+        that are actually legal for the selected from→to.
+        Returns the chosen piece type or None if canceled.
+        """
+        # Build dynamic choices from what's actually legal
+        label_for = {
+            chess.QUEEN:  "Q",
+            chess.ROOK:   "R",
+            chess.BISHOP: "B",
+            chess.KNIGHT: "N",
+        }
+        priority = [chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT]
+        choices = [(pt, label_for[pt]) for pt in priority if pt in allowed_types]
+        if not choices:
+            return None
+
+        f = chess.square_file(to_square)
+        r = chess.square_rank(to_square)
+        px = f * TILE
+        py = (7 - r) * TILE
+        item_w, item_h = 44, 44
+        pad = 6
+        popup_w = pad + len(choices) * (item_w + pad)
+        popup_h = item_h + pad * 2
+
+        popup_x = min(max(px - popup_w // 2 + TILE // 2, 4), WIDTH - popup_w - 4)
+        popup_y = min(max(py - popup_h - 8, 4), HEIGHT - popup_h - 4)
+
+        rects = []
+        x = popup_x + pad
+        for _ptype, _label in choices:
+            rects.append(pygame.Rect(x, popup_y + pad, item_w, item_h))
+            x += item_w + pad
+
+        # Modal loop
+        while True:
+            # draw current board/background
+            self.draw_board()
+            self.draw_pieces_from_board()
+            self.draw_highlights()
+
+            # popup bg
+            popup = pygame.Surface((popup_w, popup_h), pygame.SRCALPHA)
+            popup.fill((40, 40, 40, 220))
+            self.screen.blit(popup, (popup_x, popup_y))
+
+            # draw items
+            font = pygame.font.SysFont("arial", 22, bold=True)
+            for idx, (ptype, label) in enumerate(choices):
+                rct = rects[idx]
+                pygame.draw.rect(self.screen, (220, 220, 220), rct, border_radius=6)
+                glyph = font.render(label, True, (20, 20, 20))
+                self.screen.blit(glyph, glyph.get_rect(center=rct.center))
+
+            pygame.display.flip()
+
+            # handle events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    return None
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    return None  # cancel
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mx, my = event.pos
+                    for idx, rct in enumerate(rects):
+                        if rct.collidepoint(mx, my):
+                            return choices[idx][0]  # piece type
+                    # click outside popup cancels
+                    if not pygame.Rect(popup_x, popup_y, popup_w, popup_h).collidepoint(mx, my):
+                        return None
+
+    # ---------- interaction ----------
+    def handle_human_click(self, event) -> bool:
+        """Process a click; return True iff a legal move was pushed."""
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return False
+        x, y = event.pos
+        target_sqr = get_square_from_xy(x, y)
+
+        if not self.has_selected:
+            piece = self.board.piece_at(target_sqr)
+            # only select your own piece
+            if piece and piece.color == self.board.turn:
+                self.current_sqr = target_sqr
+                # legal targets from that square
+                self.highlighted_sqrs = [m.to_square for m in self.board.legal_moves
+                                         if m.from_square == target_sqr]
+                self.has_selected = True
             else:
-                color = DARK_SQUARE
+                self.current_sqr = None
+                self.highlighted_sqrs = []
+            return False
+
+        # ---- Second click: attempt a move ----
+        from_sq = self.current_sqr
+        to_sq = target_sqr
+
+        # Quick deselect: clicking the same square toggles off
+        if to_sq == from_sq:
+            self.has_selected = False
+            self.current_sqr = None
+            self.highlighted_sqrs = []
+            return False
+
+        legal_moves = list(self.board.legal_moves)
+
+        # All legal promotions for exactly this from→to
+        promotion_moves = [
+            m for m in legal_moves
+            if m.from_square == from_sq and m.to_square == to_sq and m.promotion
+        ]
+
+        move_to_push = None
+
+        if promotion_moves:
+            # Restrict UI to actually legal promotion piece types
+            allowed_types = sorted({m.promotion for m in promotion_moves})
+            chosen = self.choose_promotion(to_sq, allowed_types)
+            if chosen is None:
+                # canceled; keep selection so user can re-try
+                return False
+
+            candidate = chess.Move(from_sq, to_sq, promotion=chosen)
+            if candidate in legal_moves:
+                move_to_push = candidate
+            else:
+                move_to_push = promotion_moves[0]
         else:
-            if f % 2 == 0:
-                color = DARK_SQUARE
-            else:
-                color = LIGHT_SQUARE
+            # Non-promotion path
+            candidate = chess.Move(from_sq, to_sq)
+            if candidate in legal_moves:
+                move_to_push = candidate
 
-        pygame.draw.rect(self.screen, color=color, rect=pygame.Rect(50 * f, 50 * (7 - r), W, H))
+        made_move = False
+        if move_to_push is not None:
+            self.board.push(move_to_push)
+            made_move = True
 
-    def update_piece(self, sqr):
-        r = chess.square_rank(sqr)
-        f = chess.square_file(sqr)
-        piece = self.board.piece_at(sqr)
+        # reset selection
+        self.has_selected = False
+        self.current_sqr = None
+        self.highlighted_sqrs = []
+        return made_move
 
-        if piece:
-            if piece.color == chess.BLACK:
-                color = BLACK
-            else:
-                color = WHITE
-            text_surface = self.font.render(piece.unicode_symbol(), True, color)
-            text_rect = text_surface.get_rect(center=(W // 2 + W * f, HEIGHT - (H // 2 + H * r)))
-            self.screen.blit(text_surface, text_rect)
+    # ---------- AI turns ----------
+    def play_minimax_turn(self):
+        mv = self.minimax.play(self.board)
+        if mv:
+            self.board.push(mv)
 
-    def get_legal_moves(self, sqr):
-        return [m for m in self.board.legal_moves if m.from_square == sqr]
+    def play_stockfish_turn(self):
+        if not self.engine:
+            self.play_minimax_turn()
+            return
+        try:
+            result = self.engine.play(self.board, STOCKFISH_LIMIT)
+            if result and result.move:
+                self.board.push(result.move)
+        except Exception as e:
+            print(f"[WARN] Stockfish error: {e}")
+            # graceful fallback
+            self.play_minimax_turn()
 
-    def highlight_legal_moves(self, mvs):
-        highlighted = []
-        for m in mvs:
-            highlighted.append(m.to_square)
-            r = chess.square_rank(m.to_square)
-            f = chess.square_file(m.to_square)
-            pygame.draw.rect(self.screen, color=HIGHLIGHT, rect=pygame.Rect(50 * f, 50 * (7 - r), W, H))
-        return highlighted
-
-    def remove_highlighted(self, sqrs):
-        while sqrs:
-            s = sqrs.pop(0)
-            self.update_square(s)
-            self.update_piece(s)
-
+    # ---------- main loop ----------
     def play(self):
         pygame.init()
-        self.font = pygame.font.SysFont("segoeuisymbol", 36)
+        pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+        self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         clock = pygame.time.Clock()
-        self.draw_board()
-        self.draw_pieces()
 
-        while self.running and not self.board.is_checkmate() and not self.board.is_stalemate():
-            if self.board.turn == chess.WHITE:
-                if self.p1 == "human":
-                    self.play_human_move()
+        while self.running and not self.board.is_game_over():
+            moved_this_frame = False
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
                 else:
-                    self.play_ai_move()
-            else:
-                if self.p2 == "human":
-                    self.play_human_move()
-                else:
-                    self.play_ai_move()
+                    if self.board.turn == chess.WHITE and self.white_player == "human":
+                        moved_this_frame |= self.handle_human_click(event)
+                    elif self.board.turn == chess.BLACK and self.black_player == "human":
+                        moved_this_frame |= self.handle_human_click(event)
+
+            # draw current state
+            self.draw_board()
+            self.draw_pieces_from_board()
+            self.draw_highlights()
             pygame.display.flip()
-            clock.tick(60)  # limits FPS to 60
 
-        pygame.quit()
-        self.engine.quit()
+            if moved_this_frame:
+                clock.tick(60)
+                continue
 
-    def play_human_move(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = event.pos
-                selected_sqr = get_square(x, y)
-                legal_moves = self.get_legal_moves(selected_sqr)
+            # 2) AI turn
+            if self.running:
+                if self.board.turn == chess.WHITE and self.white_player != "human":
+                    if self.white_player == "minimax":
+                        self.play_minimax_turn()
+                    elif self.white_player == "stockfish":
+                        self.play_stockfish_turn()
+                elif self.board.turn == chess.BLACK and self.black_player != "human":
+                    if self.black_player == "minimax":
+                        self.play_minimax_turn()
+                    elif self.black_player == "stockfish":
+                        self.play_stockfish_turn()
 
-                if self.has_selected:
-                    move = chess.Move(self.current_sqr, selected_sqr)
-                    if move in self.board.legal_moves:
-                        self.board.push(move)
-                        self.update_square(self.current_sqr)
-                        self.update_square(selected_sqr)
-                        self.update_piece(selected_sqr)
-                        self.has_selected = False
-                        self.remove_highlighted(self.highlighted_sqrs)
-                        self.highlighted_sqrs = []
-                else:
-                    self.highlighted_sqrs = self.highlight_legal_moves(legal_moves)
-                    self.current_sqr = selected_sqr
-                    self.has_selected = True
+            self.draw_board()
+            self.draw_pieces_from_board()
+            self.draw_highlights()
+            pygame.display.flip()
+            clock.tick(60)
 
-    def play_ai_move(self):
-        time.sleep(1)
-        current_move = self.engine.play(self.board, chess.engine.Limit(time=0.1)).move
-        self.board.push(current_move)
-        self.update_square(current_move.from_square)
-        self.update_square(current_move.to_square)
-        self.update_piece(current_move.to_square)
+        # ----- Result overlay for a few seconds, then close -----
+        if self.running:
+            self.draw_board()
+            self.draw_pieces_from_board()
+            self.draw_highlights()
+            self.show_center_banner(self.get_result_text())
+            pygame.display.flip()
+
+            # Wait until user manually closes the window
+            waiting = True
+            while waiting:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        waiting = False
+                pygame.time.Clock().tick(30)
+
 
 def main():
-    game = ChessAI("human", "stockfish")
+    # Choose players per side: "human", "minimax", or "stockfish"
+    # Example: Minimax (white) vs Human (black)
+    game = ChessGame(white_player="human", black_player="human", minimax_depth=4)
     game.play()
 
-main()
+
+if __name__ == "__main__":
+    main()

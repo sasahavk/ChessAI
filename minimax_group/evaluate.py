@@ -117,8 +117,6 @@ def evaluate_piece_square_tables(board: chess.Board) -> int:
                 score -= pst[mirrored_square]
     return score
 
-import chess
-
 def evaluate_pawn_structure(board: chess.Board) -> int:
     score = 0
 

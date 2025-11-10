@@ -117,60 +117,67 @@ def evaluate_piece_square_tables(board: chess.Board) -> int:
                 score -= pst[mirrored_square]
     return score
 
+import chess
+
 def evaluate_pawn_structure(board: chess.Board) -> int:
     score = 0
 
-    for color in [chess.WHITE, chess.BLACK]:
-        pawns = list(board.pieces(chess.PAWN, color))
-        files = {f: [] for f in range(8)}
-        for sq in pawns:
-            files[chess.square_file(sq)].append(sq)
+    for color in (chess.WHITE, chess.BLACK):
+        pawns = board.pieces(chess.PAWN, color)
+
+        # Pre-split pawns by file using bitboards
+        files = [pawns & chess.BB_FILES[f] for f in range(8)]
 
         # Doubled pawns
         for f in range(8):
-            n = len(files[f])
+            n = files[f].bit_count()
             if n > 1:
                 score += (-15 * (n - 1)) if color == chess.WHITE else (15 * (n - 1))
 
         # Isolated pawns
         isolated_files = []
         for f in range(8):
-            if len(files[f]) == 0:
-                continue
-            neighbors = []
-            if f > 0:
-                neighbors.extend(files[f - 1])
-            if f < 7:
-                neighbors.extend(files[f + 1])
-            if len(neighbors) == 0:
-                isolated_files.append(f)
-                score += (-20) if color == chess.WHITE else 20
+            if files[f]:
+                left = files[f - 1] if f > 0 else 0
+                right = files[f + 1] if f < 7 else 0
+                if (left | right) == 0:
+                    isolated_files.append(f)
+                    score += (-20) if color == chess.WHITE else 20
 
         # Passed pawns
+        enemy_pawns = board.pieces(chess.PAWN, not color)
         for sq in pawns:
             f = chess.square_file(sq)
             r = chess.square_rank(sq)
-            passed = True
-            enemy_pawns = board.pieces(chess.PAWN, not color)
-            for df in [-1, 0, 1]:
+
+            # Squares in front of pawn, including diagonals
+            mask = 0
+            for df in (-1, 0, 1):
                 nf = f + df
                 if 0 <= nf <= 7:
-                    for ep in enemy_pawns:
-                        er = chess.square_rank(ep)
-                        ef = chess.square_file(ep)
-                        if ef == nf and ((color == chess.WHITE and er > r) or (color == chess.BLACK and er < r)):
-                            passed = False
-                            break
-                    if not passed:
-                        break
+                    # Create the file mask in front direction
+                    if color == chess.WHITE:
+                        mask |= chess.BB_FILES[nf] & chess.BB_RANKS[r+1:]
+                    else:
+                        mask |= chess.BB_FILES[nf] & chess.BB_RANKS[:r]
+
+            # If enemy pawn in front mask → not passed
+            if enemy_pawns & mask:
+                passed = False
+            else:
+                passed = True
+
             if passed:
                 bonus = 8 * (r if color == chess.WHITE else 7 - r)
                 score += bonus if color == chess.WHITE else -bonus
 
-        # Hanging pawns (two adjacent pawns with no friendly pawns on outside files)
-        for i in range(7):
-            if i in isolated_files and (i + 1) in isolated_files:
-                score -= 15 if color == chess.WHITE else +15
+        # Hanging pawns
+        for f in range(7):
+            if files[f] and files[f + 1]:  # Two adjacent pawns
+                left_empty = (f == 0 or not files[f - 1])
+                right_empty = (f + 1 == 7 or not files[f + 2])
+                if left_empty and right_empty:
+                    score += (-15) if color == chess.WHITE else 15
 
     return score
 

@@ -211,27 +211,42 @@ def evaluate_rook_files(board: chess.Board) -> int:
 
     return score
 
+import chess
+
 def evaluate_knight_outposts(board: chess.Board) -> int:
     score = 0
-    for color in [chess.WHITE, chess.BLACK]:
-        knights = list(board.pieces(chess.KNIGHT, color))
-        enemy_pawns = board.pieces(chess.PAWN, not color)
-        for n_sq in knights:
-            f = chess.square_file(n_sq)
-            r = chess.square_rank(n_sq)
-            attacked_by_pawn = False
-            for ep in enemy_pawns:
-                er = chess.square_rank(ep)
-                ef = chess.square_file(ep)
-                # Pawns attack diagonally
-                if color == chess.WHITE and (er + 1 == r) and abs(ef - f) == 1:
-                    attacked_by_pawn = True
-                    break
-                if color == chess.BLACK and (er - 1 == r) and abs(ef - f) == 1:
-                    attacked_by_pawn = True
-                    break
-            if not attacked_by_pawn:
-                score += 20 if color == chess.WHITE else -20
+
+    # Precompute pawn attack maps once
+    white_pawn_attacks = chess.shift_up_left(board.pieces(chess.PAWN, chess.WHITE)) | \
+                         chess.shift_up_right(board.pieces(chess.PAWN, chess.WHITE))
+    black_pawn_attacks = chess.shift_down_left(board.pieces(chess.PAWN, chess.BLACK)) | \
+                         chess.shift_down_right(board.pieces(chess.PAWN, chess.BLACK))
+
+    for color in (chess.WHITE, chess.BLACK):
+        knights = board.pieces(chess.KNIGHT, color)
+
+        # Territory definition: Knight must be on the "enemy side"
+        if color == chess.WHITE:
+            # White knight must be on ranks 4-7 → square rank >= 3
+            territory_mask = chess.BB_RANK_4 | chess.BB_RANK_5 | chess.BB_RANK_6 | chess.BB_RANK_7
+            attacked_by_enemy_pawn = black_pawn_attacks
+        else:
+            # Black knight must be on ranks 0-3 → square rank <= 4
+            territory_mask = chess.BB_RANK_1 | chess.BB_RANK_2 | chess.BB_RANK_3 | chess.BB_RANK_4
+            attacked_by_enemy_pawn = white_pawn_attacks
+
+        # Filter knights to only those in enemy territory
+        outpost_candidates = knights & territory_mask
+
+        # Remove knights that are attackable by enemy pawns
+        safe_outposts = outpost_candidates & ~attacked_by_enemy_pawn
+
+        # Count outposts
+        count = safe_outposts.bit_count()
+
+        # Apply bonus
+        score += (20 * count) if color == chess.WHITE else -(20 * count)
+
     return score
 
 # Are we in the opening, middlegame, or endgame?

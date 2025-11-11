@@ -13,6 +13,7 @@ EARLY_GAME = 0
 MID_GAME = 1
 END_GAME = 2
 
+
 class MaterialFeatureExtractor:
     def __init__(self, board: chess.Board, game_stage: int):
         self.board = board

@@ -311,6 +311,7 @@ class ChessGame:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                    self.engine.quit()
                 else:
                     if self.board.turn == chess.WHITE and self.white_player == "human":
                         moved_this_frame |= self.handle_human_click(event)
@@ -361,7 +362,6 @@ class ChessGame:
                     if event.type == pygame.QUIT:
                         waiting = False
                 pygame.time.Clock().tick(30)
-
 
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"

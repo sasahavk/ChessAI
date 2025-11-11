@@ -6,6 +6,8 @@ import chess.engine
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
 
+import env_variables as env
+
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
 
@@ -15,11 +17,6 @@ LIGHT_SQ = (240, 217, 181)
 DARK_SQ = (181, 136, 99)
 HILITE_RGBA = (255, 255, 0, 90)
 
-FONT_NAME = "segoeuisymbol"
-FONT_SIZE = 36
-
-# Stockfish: set path when you’re ready
-STOCKFISH_PATH = r""
 STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
 
 # How long to display result screen (ms)
@@ -59,9 +56,9 @@ class ChessGame:
 
         self.engine = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
-            if STOCKFISH_PATH:
+            if env.STOCKFISH_PATH:
                 try:
-                    self.engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+                    self.engine = chess.engine.SimpleEngine.popen_uci(env.STOCKFISH_PATH)
                 except Exception as e:
                     print(f"[WARN] Could not start Stockfish: {e}")
                     self.engine = None
@@ -304,7 +301,7 @@ class ChessGame:
         pygame.init()
         pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+        self.font = pygame.font.SysFont(env.FONT_NAME, env.FONT_SIZE)
         self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         clock = pygame.time.Clock()
 

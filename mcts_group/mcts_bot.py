@@ -29,6 +29,7 @@ class Node:
 
 	def add_child(self, move:chess.Move) -> "Node":
 		newBoard:chess.Board = self.board.copy()
+
 		newBoard.push(move)  # performs move on the board
 		child:"Node" = Node(newBoard, parent=self, lastMove=move)
 
@@ -58,7 +59,8 @@ class MonteCarloSearchTreeBot:
 
 		if not root.children:
 			return random.choice(list(board.legal_moves))
-		return max(root.children, key=lambda n: n.score).move
+		
+		return max(root.children, key=lambda n: n.score).lastMove
 	
 	def applyTreePolicy(self, node:Node) -> Node:
 		currentNode:Node = node
@@ -81,9 +83,10 @@ class MonteCarloSearchTreeBot:
 				elif result == "0-1": return VAL_LOSE
 				else: return VAL_TIE
 			
-			if not node.untried_moves:
+			currentLegalMoves:list[chess.Move] = list(simBoard.legal_moves)
+			if not currentLegalMoves:
 				break
-			simBoard.push(random.choice(node.untried_moves))
+			simBoard.push(random.choice(currentLegalMoves))
 
 		# if max simulation depth reached, return board score based on evaluation
 		return self.evalFunc(simBoard)

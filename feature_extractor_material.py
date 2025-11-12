@@ -21,6 +21,9 @@ class MaterialFeatureExtractor:
         self.features = [0] * self.feature_count
         self.game_stage = game_stage
 
+    def set_board(self, board):
+        self.board = board
+
     def extract_features(self):
         i = 0
         for name, method in sorted(inspect.getmembers(self, predicate=inspect.ismethod)):

@@ -639,3 +639,15 @@ class FeatureExtractor:
                 self.features[i] = value
                 i += 1
         return self.features
+
+fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+fe = FeatureExtractor(chess.Board(fen), 0)
+print(fe.get_features())
+
+fen2 = "r1b1k1nr/p2p1ppp/2nPpb2/qpp1P3/8/5N2/PPP1QPPP/RNB1KB1R w KQkq - 1 8"
+fe.set_board(chess.Board(fen2))
+print(fe.get_features())
+
+fen3 = "6k1/p4p2/2pN3p/8/r7/7P/5PPK/8 w - - 4 38"
+fe.set_board(chess.Board(fen3))
+print(fe.get_features())

@@ -372,6 +372,7 @@ class ChessGame:
             pygame.display.flip()
 
             # Wait until user manually closes the window
+            self.engine.quit()
             waiting = True
             while waiting:
                 for event in pygame.event.get():

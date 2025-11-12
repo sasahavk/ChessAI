@@ -46,7 +46,7 @@ class ChessGame:
         self.board = chess.Board()
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
         self.mcts = MonteCarloSearchTreeBot(
-            numRootSimulations=mcts_root_sim_count, maxSimDepth=mcts_depth, evalFunc=evaluate
+            numRootSimulations=mcts_root_sim_count, maxSimDepth=mcts_depth  # TODO:  set evalFunc to minimax group's eval function once their code is on the repo
         )
 
         self.screen = None
@@ -307,6 +307,10 @@ class ChessGame:
             print(f"[WARN] Stockfish error: {e}")
             # graceful fallback
             self.play_minimax_turn()
+    
+    def kill_bot(self):
+        if self.engine != None:
+            self.engine.quit()
 
     # ---------- main loop ----------
     def play(self):
@@ -323,7 +327,7 @@ class ChessGame:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                    self.engine.quit()
+                    self.kill_bot()
                 else:
                     if self.board.turn == chess.WHITE and self.white_player == "human":
                         moved_this_frame |= self.handle_human_click(event)
@@ -372,7 +376,7 @@ class ChessGame:
             pygame.display.flip()
 
             # Wait until user manually closes the window
-            self.engine.quit()
+            self.kill_bot()
             waiting = True
             while waiting:
                 for event in pygame.event.get():
@@ -383,7 +387,7 @@ class ChessGame:
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    game = ChessGame(white_player="human", black_player="mcts", minimax_depth=4)
+    game = ChessGame(white_player="mcts", black_player="mcts", minimax_depth=4)
     game.play()
 
 

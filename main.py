@@ -2,7 +2,9 @@
 import pygame
 import chess
 import chess.engine
-
+import csv
+from pathlib import Path
+import time
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
 
@@ -19,7 +21,7 @@ FONT_NAME = "segoeuisymbol"
 FONT_SIZE = 36
 
 # Stockfish: set path when you’re ready
-STOCKFISH_PATH = r""
+STOCKFISH_PATH = r"C:\Users\dhruv\PycharmProjects\stockfish\stockfish-windows-x86-64-avx2.exe"
 STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
 
 # How long to display result screen (ms)
@@ -67,6 +69,13 @@ class ChessGame:
                     self.engine = None
             else:
                 print("[INFO] STOCKFISH_PATH not set; Stockfish disabled for this run.")
+
+        if self.engine:
+            try:
+                # example: set strength to ~1500 Elo
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1600})
+            except Exception as e:
+                print(f"[WARN] Could not configure Stockfish options: {e}")
 
     def draw_board(self):
         for r in range(8):
@@ -300,37 +309,49 @@ class ChessGame:
             self.play_minimax_turn()
 
     # ---------- main loop ----------
-    def play(self):
-        pygame.init()
-        pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
-        self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        clock = pygame.time.Clock()
+    # In ChessGame
+    def play(self, render: bool | None = None, block_on_gameover: bool | None = None):
+        # Auto settings: show UI if a human is involved; block at end iff we are rendering
+        if render is None:
+            render = (self.white_player == "human" or self.black_player == "human")
+        if block_on_gameover is None:
+            block_on_gameover = render
+
+        if render:
+            pygame.init()
+            pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
+            self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+            self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+            self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            clock = pygame.time.Clock()
+        else:
+            clock = None  # headless
+
+        # --- main loop unchanged, but guard all drawing/event code with `if render:` ---
 
         while self.running and not self.board.is_game_over():
             moved_this_frame = False
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                else:
-                    if self.board.turn == chess.WHITE and self.white_player == "human":
-                        moved_this_frame |= self.handle_human_click(event)
-                    elif self.board.turn == chess.BLACK and self.black_player == "human":
-                        moved_this_frame |= self.handle_human_click(event)
+            if render:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                    else:
+                        if self.board.turn == chess.WHITE and self.white_player == "human":
+                            moved_this_frame |= self.handle_human_click(event)
+                        elif self.board.turn == chess.BLACK and self.black_player == "human":
+                            moved_this_frame |= self.handle_human_click(event)
 
-            # draw current state
-            self.draw_board()
-            self.draw_pieces_from_board()
-            self.draw_highlights()
-            pygame.display.flip()
+                self.draw_board()
+                self.draw_pieces_from_board()
+                self.draw_highlights()
+                pygame.display.flip()
 
-            if moved_this_frame:
-                clock.tick(60)
-                continue
+                if moved_this_frame:
+                    clock.tick(60)
+                    continue
 
-            # 2) AI turn
+            # AI turn(s)
             if self.running:
                 if self.board.turn == chess.WHITE and self.white_player != "human":
                     if self.white_player == "minimax":
@@ -343,21 +364,46 @@ class ChessGame:
                     elif self.black_player == "stockfish":
                         self.play_stockfish_turn()
 
-            self.draw_board()
-            self.draw_pieces_from_board()
-            self.draw_highlights()
-            pygame.display.flip()
-            clock.tick(60)
+            if render:
+                self.draw_board()
+                self.draw_pieces_from_board()
+                self.draw_highlights()
+                pygame.display.flip()
+                clock.tick(60)
 
-        # ----- Result overlay for a few seconds, then close -----
-        if self.running:
+        # ----- Game over -----
+        # Decide winner/label once
+        outcome = self.board.outcome()
+        if outcome and outcome.winner is not None:
+            winner = "white" if outcome.winner else "black"
+        elif self.board.is_checkmate():
+            winner = "black" if self.board.turn == chess.WHITE else "white"
+        else:
+            winner = "draw"
+
+        # Print to terminal every game
+        print(f"[RESULT] Winner: {winner}  (white={self.white_player}, black={self.black_player})")
+
+        # Show banner only when rendering
+        if self.running and render:
             self.draw_board()
             self.draw_pieces_from_board()
             self.draw_highlights()
             self.show_center_banner(self.get_result_text())
             pygame.display.flip()
 
-            # Wait until user manually closes the window
+        # Append to CSV (same as you had)
+        results_path = Path("results_log.csv")
+        write_header = not results_path.exists()
+        with results_path.open("a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if write_header:
+                writer.writerow(["game_id", "winner", "white_player", "black_player"])
+            existing_lines = sum(1 for _ in open(results_path, "r", encoding="utf-8")) - (1 if write_header else 0)
+            writer.writerow([existing_lines + 1, winner, self.white_player, self.black_player])
+
+        # Keep window open at end only when interactive
+        if block_on_gameover and render:
             waiting = True
             while waiting:
                 for event in pygame.event.get():
@@ -365,13 +411,54 @@ class ChessGame:
                         waiting = False
                 pygame.time.Clock().tick(30)
 
+        # Cleanup
+        if self.engine:
+            try:
+                self.engine.quit()
+            except Exception:
+                pass
+        if render:
+            pygame.quit()
+
+
+def run_batch(num_games=10):
+    for i in range(1, num_games + 1):
+        print(f"\n=== Starting game {i} ===")
+
+        # Create a new game instance each time
+        game = ChessGame(
+            white_player="minimax",
+            black_player="stockfish",
+            minimax_depth=4,
+        )
+
+        start_time = time.time()
+        # Render = True (show board), block_on_gameover = False (auto close)
+        game.play(render=True, block_on_gameover=False)
+        end_time = time.time()
+
+        print(f"Game {i} finished in {end_time - start_time:.2f}s\n")
+
+        # Cleanup between games
+        if game.engine:
+            try:
+                game.engine.quit()
+            except Exception:
+                pass
+
+        pygame.quit()  # close window fully before starting next
+        time.sleep(1)  # small delay between games (optional, for clarity)
+
+    print("\n✅ All games finished.")
+
+
 
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    game = ChessGame(white_player="human", black_player="human", minimax_depth=4)
-    game.play()
-
+    #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
+    #game.play()
+    run_batch(num_games=10)
 
 if __name__ == "__main__":
     main()

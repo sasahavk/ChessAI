@@ -6,7 +6,7 @@ MVV = {
     chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 10000
 }
 
-# For SEE we can reuse MVV values; split out for clarity
+# For SEE, reuse MVV values; split out for clarity
 SEE_VAL = {
     chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
     chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 10000
@@ -15,7 +15,6 @@ SEE_VAL = {
 # Skip captures in QS if SEE says you lose ≥ this many centipawns
 SEE_PRUNE_MARGIN = 50  # 0.5 pawn; tune 0..100
 
-
 MATE_SCORE = 1000000
 
 class MinimaxBot:
@@ -23,69 +22,126 @@ class MinimaxBot:
         self.depth = depth
         self.eval_fn = eval_fn  # evaluate(board) returns + for white, - for black
 
+    def preferred_first(self, board: chess.Board, moves: list[chess.Move], preferred: chess.Move | None):
+        if preferred is None:
+            return
+        try:
+            i = moves.index(preferred)
+            if i != 0:
+                moves[0], moves[i] = moves[i], moves[0]
+        except ValueError:
+            pass
+
     def play(self, board):
         """
         Returns the best move for the current board position.
         White always maximizes.
         Black always minimizes.
         """
+
+        """for move in legal_moves:
+                    board.push(move)
+                    value = self.minimax(board, self.depth - 1, alpha, beta, ply = 1)
+                    board.pop()
+                    #print("Move: ", move)
+                    #print("Value: ", value)
+                    if board.turn == chess.WHITE:
+                        # We restored the board, so board.turn is the side BEFORE move
+                        # That means we check white choice here
+                        if value > best_value:
+                            best_value = value
+                            best_move = move
+                        alpha = max(alpha, best_value)
+                    else:
+                        if value < best_value:
+                            best_value = value
+                            best_move = move
+                        beta = min(beta, best_value)
+
+                    if beta <= alpha:
+                        break
+                #print("\nBest move:", best_move)
+                #print("Best score:", best_value)"""
+
         if board.is_game_over():
             return None
 
-        alpha = -math.inf
-        beta = math.inf
+        white_turn = (board.turn == chess.WHITE)
+
+        legal_moves = list(board.legal_moves)
+        if not legal_moves:
+            return None
+        legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+
+        best_move_overall = None
+        best_value_overall = -math.inf if white_turn else math.inf
+
+        pv_move = None
+
         best_move = None
 
         # White maximizes score, Black minimizes
-        best_value = -math.inf if board.turn == chess.WHITE else math.inf
+        best_value = -math.inf if white_turn else math.inf
 
-        legal_moves = list(board.legal_moves)
-        legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+        for d in range(1, self.depth + 1):
+            alpha = -math.inf
+            beta = math.inf
+            best_move_this_iter = None
+            best_value_this_iter = -math.inf if white_turn else math.inf
 
-        for move in legal_moves:
-            board.push(move)
-            value = self.minimax(board, self.depth - 1, alpha, beta, ply = 1)
-            board.pop()
-            #print("Move: ", move)
-            #print("Value: ", value)
-            if board.turn == chess.WHITE:
-                # We restored the board, so board.turn is the side BEFORE move
-                # That means we check white choice here
-                if value > best_value:
-                    best_value = value
-                    best_move = move
-                alpha = max(alpha, best_value)
-            else:
-                if value < best_value:
-                    best_value = value
-                    best_move = move
-                beta = min(beta, best_value)
+            ordered_moves = legal_moves[:]
 
-            if beta <= alpha:
-                break
-        #print("\nBest move:", best_move)
-        #print("Best score:", best_value)
-        return best_move
+            self.preferred_first(board, ordered_moves, pv_move)
+
+            for move in ordered_moves:
+                board.push(move)
+                value = self.minimax(board, d - 1, alpha, beta, ply=1)
+                board.pop()
+
+                if white_turn:
+                    if value > best_value_this_iter:
+                        best_value_this_iter = value
+                        best_move_this_iter = move
+                        alpha = max(alpha, best_value_this_iter)
+                else:
+                    if value < best_value_this_iter:
+                        best_value_this_iter = value
+                        best_move_this_iter = move
+                        beta = min(beta, best_value_this_iter)
+
+                if beta <= alpha:
+                    break
+
+                if best_move_this_iter is None:
+                    best_move_this_iter = ordered_moves[0]
+
+                pv_move = best_move_this_iter
+
+                best_move_overall = best_move_this_iter
+                best_value_overall = best_value_this_iter
+
+                self.preferred_first(board, ordered_moves, pv_move)
+
+        return best_move_overall
 
     def minimax(self, board, depth, alpha, beta, ply):
-        """
-        Minimax using board.turn instead of passing maximizing_player.
-        eval_fn returns score from WHITE perspective.
-        """
         # Terminal states
-        if depth == 0 or board.is_game_over(claim_draw=False):
+        if board.is_stalemate() or board.is_insufficient_material():
+            return 0
 
-            # Checkmate scoring (from white POV)
+        if board.can_claim_fifty_moves() or board.can_claim_threefold_repetition():
+            return 0
+
+            # Full terminal check (rare path)
+        if board.is_game_over(claim_draw=False):
             if board.is_checkmate():
                 return -(MATE_SCORE - ply) if board.turn == chess.WHITE else (MATE_SCORE - ply)
+            return 0
 
-            # Draw
-            if board.is_stalemate() or board.is_insufficient_material():
-                return 0
-
-
+            # --- depth / QS handoff ---
+        if depth <= 0:
             if board.is_check():
-                depth = 1  # extend once for checking nodes
+                depth = 1  # one-ply check extension
             else:
                 return self.quiescence(board, alpha, beta, ply)
 
@@ -248,21 +304,32 @@ class MinimaxBot:
             return stand_pat
 
         # ---- NEW: SEE filter + ordering ----
-        scored = []
+        buckets = []
         for m in raw_moves:
-            see = self.static_exchange_eval(board, m)
-            # prune clearly losing captures (tunable margin)
-            if see < -SEE_PRUNE_MARGIN:
+            mvv_lva = self.victim_value(board, m)  # (victim-attacker)
+            # obvious losers: skip immediately
+            if mvv_lva < -150:  # tune: -100..-200
                 continue
-            # tie-break with your victim_value (MVV-LVA) to help αβ
-            scored.append((see, self.victim_value(board, m), m))
+            # obvious winners: trust MVV–LVA, no SEE needed
+            if mvv_lva > 150:
+                buckets.append((9999, mvv_lva, m))  # huge SEE key so they sort first
+                continue
+            # marginal: compute SEE (expensive)
+            see = self.static_exchange_eval(board, m)
+            if see < -50:  # prune small losers
+                continue
+            buckets.append((see, mvv_lva, m))
 
-        if not scored:
+        if not buckets:
             return stand_pat
 
+        # order by (SEE or 9999), then MVV–LVA
+        buckets.sort(key=lambda t: (t[0], t[1]), reverse=True)
+        moves = [m for _, __, m in buckets]
+
         # Order best tactical payoffs first
-        scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
-        moves = [m for _, __, m in scored]
+        #scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
+        #moves = [m for _, __, m in scored]
         # ---- END NEW ----
 
         if board.turn == chess.WHITE:

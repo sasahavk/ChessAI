@@ -73,7 +73,7 @@ class ChessGame:
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1600})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1700})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
 
@@ -429,7 +429,7 @@ def run_batch(num_games=10):
         game = ChessGame(
             white_player="minimax",
             black_player="stockfish",
-            minimax_depth=4,
+            minimax_depth=5,
         )
 
         start_time = time.time()

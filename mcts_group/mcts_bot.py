@@ -67,7 +67,7 @@ class MonteCarloSearchTreeBot:
 
 		while not (currentNode.board.is_game_over()):
 			if currentNode.untried_moves: # "play" a random move
-				randomMove:chess.Move = random.choice(node.untried_moves)
+				randomMove:chess.Move = random.choice(currentNode.untried_moves)
 				return currentNode.add_child(randomMove)
 			currentNode = currentNode.best_child()
 		return currentNode

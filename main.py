@@ -5,6 +5,7 @@ import chess.engine
 
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
+from mcts_group.mcts_bot import MonteCarloSearchTreeBot
 
 import env_variables as env
 
@@ -35,14 +36,18 @@ class ChessGame:
     Side strings:
       - "human": clicks
       - "minimax": our Python Minimax
+      - "mcts": our Python Monte Carlo Tree Search
       - "stockfish": external engine (if STOCKFISH_PATH is set)
     """
-    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4):
+    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4, mcts_root_sim_count=10, mcts_depth=4):
         self.white_player = white_player
         self.black_player = black_player
 
         self.board = chess.Board()
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
+        self.mcts = MonteCarloSearchTreeBot(
+            numRootSimulations=mcts_root_sim_count, maxSimDepth=mcts_depth, evalFunc=evaluate
+        )
 
         self.screen = None
         self.font = None
@@ -282,6 +287,13 @@ class ChessGame:
         mv = self.minimax.play(self.board)
         if mv:
             self.board.push(mv)
+    
+    def play_mcts_turn(self):
+        move = self.mcts.play(self.board)
+        if move:
+            self.board.push(move)
+        else:
+            print("uh oh there should be a mcts move")
 
     def play_stockfish_turn(self):
         if not self.engine:
@@ -299,7 +311,7 @@ class ChessGame:
     # ---------- main loop ----------
     def play(self):
         pygame.init()
-        pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
+        pygame.display.set_caption("Chess — Human / Minimax / Monte Carlo / Stockfish")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.font = pygame.font.SysFont(env.FONT_NAME, env.FONT_SIZE)
         self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -333,11 +345,15 @@ class ChessGame:
                 if self.board.turn == chess.WHITE and self.white_player != "human":
                     if self.white_player == "minimax":
                         self.play_minimax_turn()
+                    elif self.white_player == "mcts":
+                        self.play_mcts_turn()
                     elif self.white_player == "stockfish":
                         self.play_stockfish_turn()
                 elif self.board.turn == chess.BLACK and self.black_player != "human":
                     if self.black_player == "minimax":
                         self.play_minimax_turn()
+                    elif self.black_player == "mcts":
+                        self.play_mcts_turn()
                     elif self.black_player == "stockfish":
                         self.play_stockfish_turn()
 
@@ -366,7 +382,7 @@ class ChessGame:
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    game = ChessGame(white_player="human", black_player="human", minimax_depth=4)
+    game = ChessGame(white_player="human", black_player="mcts", minimax_depth=4)
     game.play()
 
 

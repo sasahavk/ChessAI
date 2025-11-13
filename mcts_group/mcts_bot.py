@@ -10,12 +10,10 @@ class Node:
 		self.board:chess.Board = board
 		self.parent:"Node" = parent
 		self.children:list["Node"] = []
-		# self.wins:float = 0.0
 		self.score:int = 0
 		self.visits:int = 0
 		self.lastMove:chess.Move = lastMove
 		self.untried_moves:list[chess.Move] = list(board.legal_moves)
-		# self.player_turn = board.turn  # True=White, False=Black
 
 	def ucb1(self) -> float:
 		if self.visits == 0:
@@ -43,8 +41,10 @@ class MonteCarloSearchTreeBot:
 		self.numRootSimulations	:int = numRootSimulations	
 		self.maxSimDepth:int = maxSimDepth
 		self.evalFunc = backupEvalFunc if (evalFunc == None) else evalFunc
+		self.color:bool = None
 
 	def play(self, board:chess.Board) -> chess.Move:
+		self.color = board.turn
 		root:Node = Node(board)
 
 		for _ in range(self.numRootSimulations):
@@ -60,7 +60,7 @@ class MonteCarloSearchTreeBot:
 		if not root.children:
 			return random.choice(list(board.legal_moves))
 		
-		return max(root.children, key=lambda n: n.score).lastMove
+		return max(root.children, key=lambda n: n.score / n.visits).lastMove
 	
 	def applyTreePolicy(self, node:Node) -> Node:
 		currentNode:Node = node
@@ -79,9 +79,12 @@ class MonteCarloSearchTreeBot:
 		for _ in range(self.maxSimDepth):
 			if simBoard.is_game_over():
 				result = simBoard.result()
-				if result == "1-0": return VAL_WIN
-				elif result == "0-1": return VAL_LOSE
-				else: return VAL_TIE
+				if result == "1-0":
+					return VAL_WIN if (self.color == chess.WHITE) else VAL_LOSE
+				elif result == "0-1":
+					return VAL_LOSE if (self.color == chess.WHITE) else VAL_WIN
+				else:
+					return VAL_TIE
 			
 			currentLegalMoves:list[chess.Move] = list(simBoard.legal_moves)
 			if not currentLegalMoves:
@@ -89,7 +92,8 @@ class MonteCarloSearchTreeBot:
 			simBoard.push(random.choice(currentLegalMoves))
 
 		# if max simulation depth reached, return board score based on evaluation
-		return self.evalFunc(simBoard)
+		boardScore:int = self.evalFunc(simBoard)
+		return boardScore if (self.color == chess.WHITE) else -boardScore
 	
 	def backpropagate(self, node:Node, score:int) -> None:
 		currentNode:Node = node
@@ -115,5 +119,9 @@ def backupEvalFunc(board:chess.Board) -> int:
 		)
     return score if board.turn else -score
 
+# for testing in play.py
+def mcts_search(board: chess.Board, iters=600, max_depth=40):
+    bot = MonteCarloSearchTreeBot(numRootSimulations=iters, maxSimDepth=max_depth)
+    return bot.play(board)
 
 

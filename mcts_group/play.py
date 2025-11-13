@@ -1,5 +1,5 @@
 import chess, time, csv
-from mcts import mcts_search
+from mcts_bot import mcts_search
 
 MCTS_ITERS = 600  
 

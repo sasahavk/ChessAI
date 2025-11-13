@@ -1,15 +1,21 @@
 import chess, time, csv
-from mcts_bot import mcts_search
+from mcts_bot import MonteCarloSearchTreeBot
 from minimax_group_evaluate import evaluate
 
-MCTS_ITERS = 600  
+MCTS_ITERS = 600
+MAX_DEPTH:int = 40
 
 def play_selfplay():
     board = chess.Board()
+    bot = MonteCarloSearchTreeBot(
+        numRootSimulations=MCTS_ITERS,
+        maxSimDepth=MAX_DEPTH,
+        evalFunc=evaluate
+    )
     moves = 0
 
     while not board.is_game_over() and moves < 200:
-        mv = mcts_search(board, evaluate, iters=MCTS_ITERS)
+        mv = bot.play(board)
         board.push(mv)
         moves += 1
         print(board, "\n")

@@ -10,7 +10,7 @@ class Node:
 		self.board:chess.Board = board
 		self.parent:"Node" = parent
 		self.children:list["Node"] = []
-		self.score:int = 0
+		self.score:float = 0
 		self.visits:int = 0
 		self.lastMove:chess.Move = lastMove
 		self.untried_moves:list[chess.Move] = list(board.legal_moves)
@@ -118,10 +118,3 @@ def backupEvalFunc(board:chess.Board) -> int:
 			- len(board.pieces(piece, chess.BLACK))
 		)
     return score if board.turn else -score
-
-# for testing in play.py
-def mcts_search(board: chess.Board, evalFunc, iters=600, max_depth=40):
-    bot = MonteCarloSearchTreeBot(numRootSimulations=iters, maxSimDepth=max_depth, evalFunc=evalFunc)
-    return bot.play(board)
-
-

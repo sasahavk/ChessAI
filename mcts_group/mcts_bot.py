@@ -69,7 +69,7 @@ class MonteCarloSearchTreeBot:
 			if currentNode.untried_moves: # "play" a random move
 				randomMove:chess.Move = random.choice(currentNode.untried_moves)
 				return currentNode.add_child(randomMove)
-			currentNode = currentNode.best_child()
+			currentNode:Node = currentNode.best_child()
 		return currentNode
 	
 	def rollout(self, node:Node) -> int:
@@ -120,8 +120,8 @@ def backupEvalFunc(board:chess.Board) -> int:
     return score if board.turn else -score
 
 # for testing in play.py
-def mcts_search(board: chess.Board, iters=600, max_depth=40):
-    bot = MonteCarloSearchTreeBot(numRootSimulations=iters, maxSimDepth=max_depth)
+def mcts_search(board: chess.Board, evalFunc, iters=600, max_depth=40):
+    bot = MonteCarloSearchTreeBot(numRootSimulations=iters, maxSimDepth=max_depth, evalFunc=evalFunc)
     return bot.play(board)
 
 

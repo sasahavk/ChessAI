@@ -46,7 +46,7 @@ class ChessGame:
         self.board = chess.Board()
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
         self.mcts = MonteCarloSearchTreeBot(
-            numRootSimulations=mcts_root_sim_count, maxSimDepth=mcts_depth  # TODO:  set evalFunc to minimax group's eval function once their code is on the repo
+            numRootSimulations=mcts_root_sim_count, maxSimDepth=mcts_depth, evalFunc=evaluate
         )
 
         self.screen = None

@@ -1,5 +1,6 @@
 import chess, time, csv
 from mcts_bot import mcts_search
+from minimax_group_evaluate import evaluate
 
 MCTS_ITERS = 600  
 
@@ -8,7 +9,7 @@ def play_selfplay():
     moves = 0
 
     while not board.is_game_over() and moves < 200:
-        mv = mcts_search(board, iters=MCTS_ITERS)
+        mv = mcts_search(board, evaluate, iters=MCTS_ITERS)
         board.push(mv)
         moves += 1
         print(board, "\n")

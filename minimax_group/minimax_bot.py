@@ -1,5 +1,23 @@
 import chess
 import math
+from dataclasses import dataclass
+from enum import Enum, auto
+import hashlib
+from chess.polyglot import zobrist_hash as poly_zobrist_hash
+
+class TTFlag(Enum):
+    EXACT = auto()
+    LOWERBOUND = auto()
+    UPPERBOUND = auto()
+
+@dataclass
+class TTEntry:
+    depth: int
+    value: float
+    flag: TTFlag
+    move: chess.Move | None
+
+TT_MAX = 200000
 
 MVV = {
     chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
@@ -21,8 +39,9 @@ class MinimaxBot:
     def __init__(self, depth=6, eval_fn=None):
         self.depth = depth
         self.eval_fn = eval_fn  # evaluate(board) returns + for white, - for black
+        self.tt: dict[int, TTEntry] = {}
 
-    def preferred_first(self, board: chess.Board, moves: list[chess.Move], preferred: chess.Move | None):
+    def preferred_first(self, moves: list[chess.Move], preferred: chess.Move | None):
         if preferred is None:
             return
         try:
@@ -32,95 +51,124 @@ class MinimaxBot:
         except ValueError:
             pass
 
+    def order_with_tt_and_pv(self, moves, tt_move, pv_move):
+        """Prioritize TT move first, then PV move (if different)."""
+        if tt_move and tt_move in moves:
+            moves.remove(tt_move)
+            moves.insert(0, tt_move)
+        if pv_move and pv_move != tt_move and pv_move in moves:
+            moves.remove(pv_move)
+            moves.insert(1, pv_move)
+
+    """def tt_key(self, board: chess.Board) -> int:
+        
+        Returns a stable 64-bit integer key for the given board.
+        Prefers python-chess's built-in Zobrist key if available,
+        otherwise falls back to a deterministic FEN-based hash.
+        
+        # Try python-chess built-ins first
+        #print("Hi")
+        try:
+            key = board._transposition_key()  # For v1.11.x
+            if isinstance(key, int):
+                print("Yayy")
+                return key
+        except AttributeError:
+            print("Noooo")
+            pass
+
+        try:
+            key = board.zobrist_hash()  # For newer versions (≥1.12)
+            if isinstance(key, int):
+                return key
+        except AttributeError:
+            pass
+
+        # Fallback: 64-bit integer derived from FEN string
+        fen_bytes = board.fen().encode("utf-8")
+        digest = hashlib.blake2b(fen_bytes, digest_size=8).digest()
+        return int.from_bytes(digest, byteorder="big", signed=False)"""
+
+    def tt_probe(self, board: chess.Board, depth: int, alpha: float, beta: float):
+        key = poly_zobrist_hash(board) & 0xFFFFFFFFFFFFFFFF
+        ent = self.tt.get(key)
+        if ent is None:
+            return None, None
+        if ent.depth >= depth:
+            if ent.flag == TTFlag.EXACT:
+                return ent.value, ent.move
+            if ent.flag == TTFlag.LOWERBOUND and ent.value >= beta:
+                return ent.value, ent.move
+            if ent.flag == TTFlag.UPPERBOUND and ent.value <= alpha:
+                return ent.value, ent.move
+        return None, ent.move
+
+    def tt_store(self, board: chess.Board, depth: int, value: float,
+                 alpha_orig: float, beta_orig: float, best_move: chess.Move | None):
+        key = poly_zobrist_hash(board) & 0xFFFFFFFFFFFFFFFF
+        if value <= alpha_orig:
+            flag = TTFlag.UPPERBOUND
+        elif value >= beta_orig:
+            flag = TTFlag.LOWERBOUND
+        else:
+            flag = TTFlag.EXACT
+
+        prev = self.tt.get(key)
+        if (prev is None) or (depth >= prev.depth):
+            if len(self.tt) >= TT_MAX:
+                self.tt.pop(next(iter(self.tt)))
+            self.tt[key] = TTEntry(depth=depth, value=value, flag=flag, move=best_move)
+
     def play(self, board):
-        """
-        Returns the best move for the current board position.
-        White always maximizes.
-        Black always minimizes.
-        """
-
-        """for move in legal_moves:
-                    board.push(move)
-                    value = self.minimax(board, self.depth - 1, alpha, beta, ply = 1)
-                    board.pop()
-                    #print("Move: ", move)
-                    #print("Value: ", value)
-                    if board.turn == chess.WHITE:
-                        # We restored the board, so board.turn is the side BEFORE move
-                        # That means we check white choice here
-                        if value > best_value:
-                            best_value = value
-                            best_move = move
-                        alpha = max(alpha, best_value)
-                    else:
-                        if value < best_value:
-                            best_value = value
-                            best_move = move
-                        beta = min(beta, best_value)
-
-                    if beta <= alpha:
-                        break
-                #print("\nBest move:", best_move)
-                #print("Best score:", best_value)"""
-
         if board.is_game_over():
             return None
-
-        white_turn = (board.turn == chess.WHITE)
 
         legal_moves = list(board.legal_moves)
         if not legal_moves:
             return None
+
+        # Initial ordering
         legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
 
-        best_move_overall = None
-        best_value_overall = -math.inf if white_turn else math.inf
-
+        white_turn = (board.turn == chess.WHITE)
         pv_move = None
+        best_move_overall = legal_moves[0]  # fallback if nothing improves
 
-        best_move = None
-
-        # White maximizes score, Black minimizes
-        best_value = -math.inf if white_turn else math.inf
-
-        for d in range(1, self.depth + 1):
+        for depth in range(1, self.depth + 1):
             alpha = -math.inf
             beta = math.inf
-            best_move_this_iter = None
-            best_value_this_iter = -math.inf if white_turn else math.inf
+            best_move_this_depth = None
+            best_value_this_depth = -math.inf if white_turn else math.inf
 
-            ordered_moves = legal_moves[:]
+            # Order for this iteration: PV first if we have one
+            ordered_moves = legal_moves.copy()
 
-            self.preferred_first(board, ordered_moves, pv_move)
+            tt_val, tt_move = self.tt_probe(board, depth, alpha, beta)
+            self.order_with_tt_and_pv(ordered_moves, tt_move, pv_move)
 
             for move in ordered_moves:
                 board.push(move)
-                value = self.minimax(board, d - 1, alpha, beta, ply=1)
+                value = self.minimax(board, depth - 1, alpha, beta, ply=1)
                 board.pop()
 
                 if white_turn:
-                    if value > best_value_this_iter:
-                        best_value_this_iter = value
-                        best_move_this_iter = move
-                        alpha = max(alpha, best_value_this_iter)
+                    if value > best_value_this_depth:
+                        best_value_this_depth = value
+                        best_move_this_depth = move
+                    alpha = max(alpha, best_value_this_depth)
                 else:
-                    if value < best_value_this_iter:
-                        best_value_this_iter = value
-                        best_move_this_iter = move
-                        beta = min(beta, best_value_this_iter)
+                    if value < best_value_this_depth:
+                        best_value_this_depth = value
+                        best_move_this_depth = move
+                    beta = min(beta, best_value_this_depth)
 
                 if beta <= alpha:
                     break
 
-                if best_move_this_iter is None:
-                    best_move_this_iter = ordered_moves[0]
-
-                pv_move = best_move_this_iter
-
-                best_move_overall = best_move_this_iter
-                best_value_overall = best_value_this_iter
-
-                self.preferred_first(board, ordered_moves, pv_move)
+            # Finalize PV and best for this depth
+            if best_move_this_depth is not None:
+                best_move_overall = best_move_this_depth
+                pv_move = best_move_this_depth  # used to order next depth
 
         return best_move_overall
 
@@ -147,36 +195,63 @@ class MinimaxBot:
 
             #print(self.eval_fn(board))
             #return self.eval_fn(board)  # No sign flipping
-
+        alpha_orig, beta_orig = alpha, beta
+        tt_value, tt_move = self.tt_probe(board, depth, alpha, beta)
+        if tt_value is not None:
+            return tt_value
         # White to move → maximize score
         if board.turn == chess.WHITE:
-            max_eval = -math.inf
+            best_val = -math.inf
+            best_move = None
             legal_moves = list(board.legal_moves)
             legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+
+            self.preferred_first(legal_moves, tt_move)
+
             for move in legal_moves:
                 board.push(move)
-                eval_value = self.minimax(board, depth - 1, alpha, beta, ply+1)
+                val = self.minimax(board, depth - 1, alpha, beta, ply+1)
                 board.pop()
-                max_eval = max(max_eval, eval_value)
-                alpha = max(alpha, eval_value)
+
+                if val > best_val:
+                    best_val = val
+                    best_move = move
+                if best_val > alpha:
+                    alpha = best_val
                 if beta <= alpha:
                     break
-            return max_eval
+
+            self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
+
+            return best_val
 
         # Black to move → minimize score
         else:
-            min_eval = math.inf
+            best_val = math.inf
+            best_move = None
             legal_moves = list(board.legal_moves)
+
             legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+            # prefer TT best move first
+            self.preferred_first(legal_moves, tt_move)
+
             for move in legal_moves:
                 board.push(move)
-                eval_value = self.minimax(board, depth - 1, alpha, beta, ply+1)
+                val = self.minimax(board, depth - 1, alpha, beta, ply + 1)
                 board.pop()
-                min_eval = min(min_eval, eval_value)
-                beta = min(beta, eval_value)
+
+                if val < best_val:
+                    best_val = val
+                    best_move = move
+                if best_val < beta:
+                    beta = best_val
                 if beta <= alpha:
                     break
-            return min_eval
+
+            # ---- TT STORE ----
+            self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
+            # ------------------
+            return best_val
 
     """def _store_killer(self, ply: int, move: chess.Move):
         k1, k2 = self.killers.get(ply, (None, None))

@@ -42,13 +42,13 @@ class ChessGame:
       - "minimax": our Python Minimax
       - "stockfish": external engine (if STOCKFISH_PATH is set)
     """
-    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4):
+    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4, flip_board=False):
         self.white_player = white_player
         self.black_player = black_player
 
         self.board = chess.Board()
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
-
+        self.flip_board = flip_board
         self.screen = None
         self.font = None
         self.running = True
@@ -73,7 +73,7 @@ class ChessGame:
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1700})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1800})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
 
@@ -425,31 +425,30 @@ def run_batch(num_games=10):
     for i in range(1, num_games + 1):
         print(f"\n=== Starting game {i} ===")
 
-        # Create a new game instance each time
         game = ChessGame(
-            white_player="minimax",
-            black_player="stockfish",
+            white_player="stockfish",
+            black_player="minimax",
             minimax_depth=5,
+            flip_board=False,  # or True; see part 2
         )
 
         start_time = time.time()
-        # Render = True (show board), block_on_gameover = False (auto close)
-        game.play(render=True, block_on_gameover=False)
+        is_last = (i == num_games)
+        game.play(render=True, block_on_gameover=is_last)
         end_time = time.time()
 
         print(f"Game {i} finished in {end_time - start_time:.2f}s\n")
 
-        # Cleanup between games
+        # For non-last games we close the window immediately; for last,
+        # play() already blocks until user closes, so this is harmless.
         if game.engine:
-            try:
-                game.engine.quit()
-            except Exception:
-                pass
+            try: game.engine.quit()
+            except Exception: pass
 
-        pygame.quit()  # close window fully before starting next
-        time.sleep(1)  # small delay between games (optional, for clarity)
+        pygame.quit()
+        if not is_last:
+            time.sleep(1)
 
-    print("\n✅ All games finished.")
 
 
 
@@ -458,7 +457,7 @@ def main():
     # Example: Minimax (white) vs Human (black)
     #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
     #game.play()
-    run_batch(num_games=10)
+    run_batch(num_games=100)
 
 if __name__ == "__main__":
     main()

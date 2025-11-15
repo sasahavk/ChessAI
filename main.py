@@ -22,7 +22,7 @@ FONT_SIZE = 36
 
 # Stockfish: set path when you’re ready
 STOCKFISH_PATH = r"C:\Users\dhruv\PycharmProjects\stockfish\stockfish-windows-x86-64-avx2.exe"
-STOCKFISH_LIMIT = chess.engine.Limit(depth=2)  # or depth=12, nodes=...
+STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
 
 # How long to display result screen (ms)
 RESULT_DISPLAY_MS = 2500

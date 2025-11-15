@@ -22,7 +22,7 @@ FONT_SIZE = 36
 
 # Stockfish: set path when you’re ready
 STOCKFISH_PATH = r"C:\Users\dhruv\PycharmProjects\stockfish\stockfish-windows-x86-64-avx2.exe"
-STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
+STOCKFISH_LIMIT = chess.engine.Limit(depth=2)  # or depth=12, nodes=...
 
 # How long to display result screen (ms)
 RESULT_DISPLAY_MS = 2500
@@ -306,7 +306,7 @@ class ChessGame:
         except Exception as e:
             print(f"[WARN] Stockfish error: {e}")
             # graceful fallback
-            self.play_minimax_turn()
+            #self.play_minimax_turn()
 
     # ---------- main loop ----------
     # In ChessGame
@@ -428,7 +428,7 @@ def run_batch(num_games=10):
         game = ChessGame(
             white_player="stockfish",
             black_player="minimax",
-            minimax_depth=5,
+            minimax_depth=4,
             flip_board=False,  # or True; see part 2
         )
 

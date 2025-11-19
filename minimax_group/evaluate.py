@@ -228,24 +228,50 @@ def evaluate_rook_files(board: chess.Board) -> int:
 def evaluate_knight_outposts(board: chess.Board) -> int:
     score = 0
     for color in [chess.WHITE, chess.BLACK]:
-        knights = list(board.pieces(chess.KNIGHT, color))
+        knights = board.pieces(chess.KNIGHT, color)
         enemy_pawns = board.pieces(chess.PAWN, not color)
+        friendly_pawns = board.pieces(chess.PAWN, color)
+
         for n_sq in knights:
             f = chess.square_file(n_sq)
             r = chess.square_rank(n_sq)
-            attacked_by_pawn = False
+
+            # 1. Must be in enemy territory
+            if color == chess.WHITE and r < 4:
+                continue
+            if color == chess.BLACK and r > 3:
+                continue
+
+            # 2. Must not be attacked by enemy pawn
+            attacked = False
             for ep in enemy_pawns:
                 er = chess.square_rank(ep)
                 ef = chess.square_file(ep)
-                # Pawns attack diagonally
                 if color == chess.WHITE and (er + 1 == r) and abs(ef - f) == 1:
-                    attacked_by_pawn = True
+                    attacked = True
                     break
                 if color == chess.BLACK and (er - 1 == r) and abs(ef - f) == 1:
-                    attacked_by_pawn = True
+                    attacked = True
                     break
-            if not attacked_by_pawn:
-                score += 20 if color == chess.WHITE else -20
+            if attacked:
+                continue
+
+            # 3. Must be supported by friendly pawn
+            supported = False
+            for fp in friendly_pawns:
+                fr = chess.square_rank(fp)
+                ff = chess.square_file(fp)
+                if color == chess.WHITE and (fr - 1 == r) and abs(ff - f) == 1:
+                    supported = True
+                if color == chess.BLACK and (fr + 1 == r) and abs(ff - f) == 1:
+                    supported = True
+
+            if not supported:
+                continue
+
+            # Award outpost bonus
+            score += 20 if color == chess.WHITE else -20
+
     return score
 
 

@@ -383,44 +383,87 @@ def evaluate_king(board: chess.Board) -> int:
 def evaluate_mobility(board: chess.Board) -> int:
     white_score = 0
     black_score = 0
-    center = [chess.D4, chess.E4, chess.D5, chess.E5]
+
+    # 16-square center (better than just 4 squares)
+    central_squares = {
+        chess.C3, chess.D3, chess.E3, chess.F3,
+        chess.C4, chess.D4, chess.E4, chess.F4,
+        chess.C5, chess.D5, chess.E5, chess.F5,
+        chess.C6, chess.D6, chess.E6, chess.F6
+    }
+
+    opening_phase = 1.0 if board.fullmove_number <= 6 else 0.0
 
     for move in board.legal_moves:
         piece = board.piece_at(move.from_square)
         if not piece:
             continue
 
-        # base mobility weight
-        weight = 0
-        if piece.piece_type == chess.PAWN:
-            rank = chess.square_rank(move.to_square)
-            if piece.color == chess.WHITE:
-                weight = 7 + (rank * 2)
-            else:
-                weight = 6 + ((7 - rank) * 2)
-            # extra +15 for moving to central squares (pawn)
-            if move.to_square in center:
-                weight += 15
-        elif piece.piece_type == chess.KNIGHT:
-            weight = 4
-            # penalty for knights in the opening (move 1)
-            if board.fullmove_number == 1:
-                weight -= 5  # small penalty for Nf3/Nc3
-        elif piece.piece_type == chess.BISHOP:
-            weight = 6
-        elif piece.piece_type == chess.ROOK:
-            weight = 6
-        elif piece.piece_type == chess.QUEEN:
-            weight = 10
-        else:
-            weight = 0
+        pts = 0
 
+        # ------------------------------
+        # PAWNS
+        # ------------------------------
+        if piece.piece_type == chess.PAWN:
+            pts = 5
+
+            # reward central pawn pushes (very important in small engines)
+            if move.to_square in {chess.E4, chess.D4, chess.E5, chess.D5}:
+                pts += 25 * opening_phase  # strong push for e4/d4
+
+            # reward moving toward center
+            if move.to_square in central_squares:
+                pts += 10
+
+        # ------------------------------
+        # KNIGHTS
+        # ------------------------------
+        elif piece.piece_type == chess.KNIGHT:
+            pts = 4
+
+            # Opening penalty: knights are OK but not e4-good
+            pts -= 6 * opening_phase
+
+        # ------------------------------
+        # BISHOPS
+        # ------------------------------
+        elif piece.piece_type == chess.BISHOP:
+            pts = 6
+
+        # ------------------------------
+        # ROOKS
+        # ------------------------------
+        elif piece.piece_type == chess.ROOK:
+            pts = 4  # weaker early
+
+            # midgame development bonus
+            if not opening_phase:
+                pts += 2
+
+        # ------------------------------
+        # QUEEN
+        # ------------------------------
+        elif piece.piece_type == chess.QUEEN:
+            pts = 2  # very low early to avoid early queen moves
+
+            # in middlegame queen mobility matters more
+            if not opening_phase:
+                pts += 6
+
+        # ------------------------------
+        # KING (rarely counts)
+        # ------------------------------
+        elif piece.piece_type == chess.KING:
+            pts = 1
+
+        # accumulate score
         if piece.color == chess.WHITE:
-            white_score += weight
+            white_score += pts
         else:
-            black_score += weight
+            black_score += pts
 
     return white_score - black_score
+
 
 
 def evaluate_center_control(board):

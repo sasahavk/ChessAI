@@ -298,45 +298,86 @@ def game_phase(board: chess.Board) -> float:
 
 
 def evaluate_king(board: chess.Board) -> int:
-    phase = game_phase(board)
-    score = 0
+    game_phase_value = game_phase(board)  # 1.0 = opening, 0.0 = endgame
+    total_score = 0
 
     for color in [chess.WHITE, chess.BLACK]:
-        king_sq = list(board.pieces(chess.KING, color))[0]
-        kr, kf = chess.square_rank(king_sq), chess.square_file(king_sq)
 
-        # Middle game
-        safety_score = 0
-        pawn_dir = 1 if color == chess.WHITE else -1
+        # -------------------------
+        # Extract king position
+        # -------------------------
+        king_square = next(iter(board.pieces(chess.KING, color)))
+        king_file = chess.square_file(king_square)
+        king_rank = chess.square_rank(king_square)
 
-        # Gradual ramp-up for pawn shield bonus
-        ramp_factor = min(board.fullmove_number / 5, 1.0)  # goes from 0 to 1 over first 5 moves
-        for df in [-1, 0, 1]:
-            r = kr + pawn_dir
-            f = kf + df
-            if 0 <= r <= 7 and 0 <= f <= 7:
-                p = board.piece_at(chess.square(f, r))
-                if p and p.piece_type == chess.PAWN and p.color == color:
-                    safety_score += 10 * ramp_factor
+        # -------------------------
+        # Middle Game King Safety
+        # -------------------------
+        king_safety_score = 0
 
-        # Enemy proximity
-        danger = 0
-        for sq in chess.SQUARES:
-            p = board.piece_at(sq)
-            if p and p.color != color:
-                pf, pr = chess.square_file(sq), chess.square_rank(sq)
-                dist = abs(kf - pf) + abs(kr - pr)
-                if dist <= 2:
-                    danger += 5 if p.piece_type != chess.PAWN else 2
-        safety_score -= danger
+        # King’s home rank (white = 0, black = 7)
+        home_rank = 0 if color == chess.WHITE else 7
 
-        # Endgame activity
-        centralization = - (abs(kf - 3.5) + abs(kr - 3.5)) * 10  # Closer to center is better
+        # We only count pawn shields when the king is near home
+        king_is_near_home = (
+            king_rank == home_rank or
+            (color == chess.WHITE and king_rank == 1) or
+            (color == chess.BLACK and king_rank == 6)
+        )
 
-        king_score = phase * safety_score + (1 - phase) * centralization
-        score += king_score if color == chess.WHITE else -king_score
+        if king_is_near_home:
+            pawn_forward_direction = 1 if color == chess.WHITE else -1
 
-    return score
+            # Check the three squares directly in front of the king
+            for file_offset in [-1, 0, 1]:
+                pawn_file = king_file + file_offset
+                pawn_rank = king_rank + pawn_forward_direction
+
+                # on board?
+                if 0 <= pawn_file <= 7 and 0 <= pawn_rank <= 7:
+                    shield_square = chess.square(pawn_file, pawn_rank)
+                    piece = board.piece_at(shield_square)
+
+                    if piece and piece.piece_type == chess.PAWN and piece.color == color:
+                        king_safety_score += 12  # pawn shield bonus
+
+        # -------------------------
+        # Enemy Proximity Penalty
+        # -------------------------
+        # Only applied in the middlegame (when king should be safe)
+        if game_phase_value > 0.35:
+            for square, piece in board.piece_map().items():
+                if piece.color != color:
+                    enemy_file = chess.square_file(square)
+                    enemy_rank = chess.square_rank(square)
+
+                    manhattan_distance = abs(king_file - enemy_file) + abs(king_rank - enemy_rank)
+
+                    if manhattan_distance <= 2:
+                        king_safety_score -= 3  # small danger penalty
+
+        # -------------------------
+        # Endgame: King Activity
+        # -------------------------
+        # Distance from center (3.5,3.5)
+        center_distance = abs(king_file - 3.5) + abs(king_rank - 3.5)
+        king_activity_score = -center_distance * 8  # closer to center = better
+
+        # -------------------------
+        # Blend based on game phase
+        # -------------------------
+        king_total = (
+            game_phase_value * king_safety_score +
+            (1 - game_phase_value) * king_activity_score
+        )
+
+        # Add from correct perspective
+        if color == chess.WHITE:
+            total_score += king_total
+        else:
+            total_score -= king_total
+
+    return total_score
 
 
 def evaluate_mobility(board: chess.Board) -> int:

@@ -465,26 +465,57 @@ def evaluate_mobility(board: chess.Board) -> int:
     return white_score - black_score
 
 
-
-def evaluate_center_control(board):
+def evaluate_center_control(board: chess.Board) -> int:
     score = 0
-    center = [chess.E4, chess.D4, chess.E5, chess.D5]
 
-    for sq in center:
+    # Modern 16-square center
+    center_squares = {
+        chess.C3, chess.D3, chess.E3, chess.F3,
+        chess.C4, chess.D4, chess.E4, chess.F4,
+        chess.C5, chess.D5, chess.E5, chess.F5,
+        chess.C6, chess.D6, chess.E6, chess.F6,
+    }
+
+    # Weight settings (centipawns)
+    occupation_values = {
+        chess.PAWN: 30,
+        chess.KNIGHT: 20,
+        chess.BISHOP: 20,
+        chess.ROOK: 10,
+        chess.QUEEN: 10,
+        chess.KING: 0
+    }
+
+    control_values = {
+        chess.PAWN: 15,
+        chess.KNIGHT: 12,
+        chess.BISHOP: 10,
+        chess.ROOK: 6,
+        chess.QUEEN: 4,
+        chess.KING: 0
+    }
+
+    for sq in center_squares:
+        # 1. Occupation bonus
         piece = board.piece_at(sq)
         if piece:
-            if piece.color == chess.WHITE:
-                if piece.piece_type == chess.PAWN:
-                    score += 80
-                else:
-                    score += 15
-            else:
-                if piece.piece_type == chess.PAWN:
-                    score -= 80
-                else:
-                    score -= 15
+            value = occupation_values.get(piece.piece_type, 0)
+            score += value if piece.color == chess.WHITE else -value
+
+        # 2. Control bonus
+        attackers_white = board.attackers(chess.WHITE, sq)
+        attackers_black = board.attackers(chess.BLACK, sq)
+
+        for attacker in attackers_white:
+            p = board.piece_at(attacker)
+            score += control_values.get(p.piece_type, 0)
+
+        for attacker in attackers_black:
+            p = board.piece_at(attacker)
+            score -= control_values.get(p.piece_type, 0)
 
     return score
+
 
 
 # Final calculation function, summation of each score * weight

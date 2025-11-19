@@ -538,7 +538,7 @@ def evaluate(board: chess.Board) -> int:
     score += w_knight_outposts * evaluate_knight_outposts(board)  # static enough
     score += w_rook_files * evaluate_rook_files(board)  # static enough
     score += w_king_safety * evaluate_king(board)  # king safety changes entirely in endgame
-    score += w_mobility * phase_value * evaluate_mobility(board)  # mobility matters more in middlegame
+    score += w_mobility * evaluate_mobility(board)  # mobility matters more in middlegame
     score += w_center * evaluate_center_control(board)  # At start, focus on moving pawns to the middle
 
     # Small tempo bonus

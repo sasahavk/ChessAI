@@ -293,8 +293,8 @@ def game_phase(board: chess.Board) -> float:
 
 
 # Likely needed for minimax
-def phase(board: chess.Board) -> float:
-    return game_phase(board)
+# def phase(board: chess.Board) -> float:
+#    return game_phase(board)
 
 
 def evaluate_king(board: chess.Board) -> int:

@@ -176,10 +176,19 @@ def evaluate_pawn_structure(board: chess.Board) -> int:
                 bonus = 8 * (r if color == chess.WHITE else 7 - r)
                 score += bonus if color == chess.WHITE else -bonus
 
-        # Hanging pawns (two adjacent pawns with no friendly pawns on outside files)
-        for i in range(7):
-            if i in isolated_files and (i + 1) in isolated_files:
-                score -= 15 if color == chess.WHITE else +15
+# Hanging pawns
+for i in range(7):
+
+    # Must have pawns in both adjacent files
+    if len(files[i]) > 0 and len(files[i+1]) > 0:
+
+        # Check outside files for friendly pawns
+        left_has_pawn  = (i > 0 and len(files[i-1]) > 0)
+        right_has_pawn = (i + 2 < 8 and len(files[i+2]) > 0)
+
+        # Hanging condition: no outside pawns
+        if not left_has_pawn and not right_has_pawn:
+            score += (-15 if color == chess.WHITE else +15)
 
     return score
 

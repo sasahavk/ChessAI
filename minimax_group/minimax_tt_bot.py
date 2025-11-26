@@ -61,7 +61,7 @@ class MinimaxBotWithTT:
         nodes_searched (int): Number of nodes evaluated
     """
     
-    def __init__(self, depth=3, eval_fn=None, tt_size_mb=128):
+    def __init__(self, depth=3, eval_fn=None, tt_size_mb=128, use_null_move_pruning=True):
         """
         Initialize the Minimax bot with Transposition Table.
         
@@ -69,6 +69,7 @@ class MinimaxBotWithTT:
             depth (int): Maximum search depth
             eval_fn: Evaluation function (defaults to comprehensive evaluation)
             tt_size_mb (int): Approximate size of TT in megabytes (not strictly enforced)
+            use_null_move_pruning (bool): Whether to use null move pruning (default: True)
         """
         self.depth = depth
         self.eval_fn = eval_fn if eval_fn else self.default_evaluation
@@ -76,6 +77,7 @@ class MinimaxBotWithTT:
         self.tt_size_mb = tt_size_mb
         # Rough estimate: each entry ~100 bytes, so max entries = (tt_size_mb * 1024 * 1024) / 100
         self.max_tt_entries = (tt_size_mb * 1024 * 1024) // 100
+        self.use_null_move_pruning = use_null_move_pruning
         
         # Statistics
         self.tt_hits = 0
@@ -126,7 +128,7 @@ class MinimaxBotWithTT:
         # Search all moves
         for move in legal_moves:
             board.push(move)
-            move_value = self.minimax(board, self.depth - 1, alpha, beta, False)
+            move_value = self.minimax(board, self.depth - 1, alpha, beta, False, allow_null=True)
             board.pop()
             
             if move_value > best_value:
@@ -144,9 +146,9 @@ class MinimaxBotWithTT:
         
         return best_move
     
-    def minimax(self, board, depth, alpha, beta, maximizing_player):
+    def minimax(self, board, depth, alpha, beta, maximizing_player, allow_null=True):
         """
-        Minimax with alpha-beta pruning and transposition table.
+        Minimax with alpha-beta pruning, transposition table, and null move pruning.
         
         Args:
             board (chess.Board): Current board state
@@ -154,6 +156,7 @@ class MinimaxBotWithTT:
             alpha (float): Best value for maximizing player
             beta (float): Best value for minimizing player
             maximizing_player (bool): True if maximizing, False if minimizing
+            allow_null (bool): Whether null move is allowed (prevents consecutive nulls)
             
         Returns:
             float: Evaluation score
@@ -188,6 +191,28 @@ class MinimaxBotWithTT:
             self.store_tt(zobrist, depth, score, TTEntryType.EXACT)
             return score
         
+        # Null move pruning
+        # Only try null move if:
+        # 1. Null move pruning is enabled
+        # 2. We're not in check (can't pass when in check)
+        # 3. Depth is sufficient (>= 3)
+        # 4. allow_null is True (prevent consecutive null moves)
+        if (self.use_null_move_pruning and allow_null and 
+            not board.is_check() and depth >= 3):
+            # Make a null move by switching turns
+            board.push(chess.Move.null())
+            # Search at reduced depth with reversed player
+            null_score = self.minimax(board, depth - 3, -beta, -beta + 1, not maximizing_player, allow_null=False)
+            board.pop()
+            
+            # If null move causes beta cutoff, prune this branch
+            if maximizing_player:
+                if null_score >= beta:
+                    return beta
+            else:
+                if null_score <= alpha:
+                    return alpha
+        
         legal_moves = list(board.legal_moves)
         
         # Move ordering: try TT move first if available
@@ -203,7 +228,7 @@ class MinimaxBotWithTT:
             max_eval = -math.inf
             for move in legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, depth - 1, alpha, beta, False)
+                eval_score = self.minimax(board, depth - 1, alpha, beta, False, allow_null=True)
                 board.pop()
                 
                 if eval_score > max_eval:
@@ -228,7 +253,7 @@ class MinimaxBotWithTT:
             min_eval = math.inf
             for move in legal_moves:
                 board.push(move)
-                eval_score = self.minimax(board, depth - 1, alpha, beta, True)
+                eval_score = self.minimax(board, depth - 1, alpha, beta, True, allow_null=True)
                 board.pop()
                 
                 if eval_score < min_eval:

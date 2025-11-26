@@ -23,9 +23,10 @@ class NegamaxBot:
         depth (int): The maximum depth to search in the game tree
         eval_fn: The evaluation function to score board positions
         nodes_searched (int): Counter for the number of nodes evaluated (for analysis)
+        use_null_move_pruning (bool): Whether to use null move pruning optimization
     """
     
-    def __init__(self, depth=3, eval_fn=None):
+    def __init__(self, depth=3, eval_fn=None, use_null_move_pruning=True):
         """
         Initialize the Negamax bot.
         
@@ -33,10 +34,12 @@ class NegamaxBot:
             depth (int): Maximum search depth (default: 3)
             eval_fn: Evaluation function that takes a board and returns a score.
                     If None, uses default evaluation function.
+            use_null_move_pruning (bool): Whether to use null move pruning (default: True)
         """
         self.depth = depth
         self.eval_fn = eval_fn if eval_fn else self.default_evaluation
         self.nodes_searched = 0
+        self.use_null_move_pruning = use_null_move_pruning
         
     def play(self, board):
         """
@@ -68,7 +71,7 @@ class NegamaxBot:
         for move in legal_moves:
             board.push(move)
             # Negamax: negate the result from the opponent's perspective
-            move_value = -self.negamax(board, self.depth - 1, -beta, -alpha)
+            move_value = -self.negamax(board, self.depth - 1, -beta, -alpha, allow_null=True)
             board.pop()
             
             # Update best move if this is better
@@ -83,9 +86,9 @@ class NegamaxBot:
         
         return best_move
     
-    def negamax(self, board, depth, alpha, beta):
+    def negamax(self, board, depth, alpha, beta, allow_null=True):
         """
-        Negamax algorithm with alpha-beta pruning.
+        Negamax algorithm with alpha-beta pruning and null move pruning.
         
         The key insight of negamax is that in a zero-sum game:
         max(a, b) = -min(-a, -b)
@@ -93,11 +96,15 @@ class NegamaxBot:
         This means we can always maximize from the current player's perspective
         and simply negate the result when switching sides.
         
+        Null move pruning: If we can afford to "pass" our turn and still get a 
+        beta cutoff, the position is so good we can prune this branch.
+        
         Args:
             board (chess.Board): Current board state
             depth (int): Remaining search depth
             alpha (float): Best score we can guarantee (lower bound)
             beta (float): Opponent's best score they can guarantee (upper bound)
+            allow_null (bool): Whether null move is allowed (prevents consecutive nulls)
             
         Returns:
             float: The evaluated score of the position from the current player's perspective
@@ -108,6 +115,24 @@ class NegamaxBot:
         if depth == 0 or board.is_game_over():
             return self.eval_fn(board)
         
+        # Null move pruning
+        # Only try null move if:
+        # 1. Null move pruning is enabled
+        # 2. We're not in check (can't pass when in check)
+        # 3. Depth is sufficient (>= 3)
+        # 4. allow_null is True (prevent consecutive null moves)
+        if (self.use_null_move_pruning and allow_null and 
+            not board.is_check() and depth >= 3):
+            # Make a null move by switching turns
+            board.push(chess.Move.null())
+            # Search at reduced depth (R=2 is common, we use depth-3 for R=2)
+            null_score = -self.negamax(board, depth - 3, -beta, -beta + 1, allow_null=False)
+            board.pop()
+            
+            # If null move causes beta cutoff, prune this branch
+            if null_score >= beta:
+                return beta
+        
         legal_moves = list(board.legal_moves)
         max_value = -math.inf
         
@@ -116,7 +141,7 @@ class NegamaxBot:
             board.push(move)
             # Recursively evaluate position and negate (switch perspective)
             # Also negate and swap alpha/beta for the opponent
-            value = -self.negamax(board, depth - 1, -beta, -alpha)
+            value = -self.negamax(board, depth - 1, -beta, -alpha, allow_null=True)
             board.pop()
             
             # Update maximum value found

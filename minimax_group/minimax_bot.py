@@ -36,10 +36,11 @@ SEE_PRUNE_MARGIN = 50  # 0.5 pawn; tune 0..100
 MATE_SCORE = 1000000
 
 class MinimaxBot:
-    def __init__(self, depth=6, eval_fn=None):
+    def __init__(self, depth=6, eval_fn=None, use_null_move_pruning=True):
         self.depth = depth
         self.eval_fn = eval_fn  # evaluate(board) returns + for white, - for black
         self.tt: dict[int, TTEntry] = {}
+        self.use_null_move_pruning = use_null_move_pruning
 
     def preferred_first(self, moves: list[chess.Move], preferred: chess.Move | None):
         if preferred is None:
@@ -148,7 +149,7 @@ class MinimaxBot:
 
             for move in ordered_moves:
                 board.push(move)
-                value = self.minimax(board, depth - 1, alpha, beta, ply=1)
+                value = self.minimax(board, depth - 1, alpha, beta, ply=1, allow_null=True)
                 board.pop()
 
                 if white_turn:
@@ -172,7 +173,7 @@ class MinimaxBot:
 
         return best_move_overall
 
-    def minimax(self, board, depth, alpha, beta, ply):
+    def minimax(self, board, depth, alpha, beta, ply, allow_null=True):
         # Terminal states
         if board.is_stalemate() or board.is_insufficient_material():
             return 0
@@ -199,6 +200,28 @@ class MinimaxBot:
         tt_value, tt_move = self.tt_probe(board, depth, alpha, beta)
         if tt_value is not None:
             return tt_value
+        
+        # Null move pruning
+        # Only try null move if:
+        # 1. Null move pruning is enabled
+        # 2. We're not in check (can't pass when in check)
+        # 3. Depth is sufficient (>= 3)
+        # 4. allow_null is True (prevent consecutive null moves)
+        if (self.use_null_move_pruning and allow_null and 
+            not board.is_check() and depth >= 3):
+            # Make a null move by switching turns
+            board.push(chess.Move.null())
+            # Search at reduced depth (R=2)
+            null_score = self.minimax(board, depth - 3, alpha, beta, ply + 1, allow_null=False)
+            board.pop()
+            
+            # If null move causes beta cutoff, prune this branch
+            if board.turn == chess.WHITE:
+                if null_score >= beta:
+                    return beta
+            else:
+                if null_score <= alpha:
+                    return alpha
         # White to move → maximize score
         if board.turn == chess.WHITE:
             best_val = -math.inf
@@ -210,7 +233,7 @@ class MinimaxBot:
 
             for move in legal_moves:
                 board.push(move)
-                val = self.minimax(board, depth - 1, alpha, beta, ply+1)
+                val = self.minimax(board, depth - 1, alpha, beta, ply+1, allow_null=True)
                 board.pop()
 
                 if val > best_val:
@@ -237,7 +260,7 @@ class MinimaxBot:
 
             for move in legal_moves:
                 board.push(move)
-                val = self.minimax(board, depth - 1, alpha, beta, ply + 1)
+                val = self.minimax(board, depth - 1, alpha, beta, ply + 1, allow_null=True)
                 board.pop()
 
                 if val < best_val:

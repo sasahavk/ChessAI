@@ -13,75 +13,74 @@ piece_values = {
 
 # Pawn PST
 pawn_table = [
-    # 8x8
     0,   0,   0,   0,   0,   0,   0,   0,
-    50, 50,  50,  50,  50,  50,  50,  50,
-    10, 10,  20,  30,  30,  20,  10,  10,
-    5,   5,  10,  27,  27,  10,   5,   5,
-    0,   0,   0,  25,  25,   0,   0,   0,
-    5,  -5, -10,   0,   0, -10,  -5,   5,
     5,  10,  10, -25, -25,  10,  10,   5,
+    5,  -5, -10,   0,   0, -10,  -5,   5,
+    0,   0,   0,  32,  35,   0,   0,   0,
+    5,   5,  10,  27,  27,  10,   5,   5,
+    10, 10,  20,  30,  30,  20,  10,  10,
+    50, 50,  50,  50,  50,  50,  50,  50,
     0,   0,   0,   0,   0,   0,   0,   0
 ]
 
 # Knight PST
 knight_table = [
-    -50, -40, -30, -30, -30, -30, -40, -50,
-    -40, -20,   0,   5,   5,   0, -20, -40,
-    -30,   5,  10,  15,  15,  10,   5, -30,
-    -30,   0,  15,  20,  20,  15,   0, -30,
-    -30,   5,  15,  20,  20,  15,   5, -30,
-    -30,   0,  20,  15,  15,  20,   0, -30,
+    -50, -35, -30, -30, -30, -30, -35, -50,
     -40, -20,   0,   0,   0,   0, -20, -40,
-    -50, -5, -30, -30, -30, -30, -5, -50
+    -30,   0,  10,  15,  15,  10,   0, -30,
+    -30,   5,  15,  20,  20,  15,   5, -30,
+    -30,   0,  15,  20,  20,  15,   0, -30,
+    -30,   5,  10,  15,  15,  10,   5, -30,
+    -40, -20,   0,   5,   5,   0, -20, -40,
+    -50, -40, -30, -30, -30, -30, -40, -50
 ]
 
 # Bishop PST
 bishop_table = [
     -20, -10, -10, -10, -10, -10, -10, -20,
-    -10,   0,   0,   0,   0,   0,   0, -10,
-    -10,   0,   5,  10,  10,   5,   0, -10,
-    -10,   5,   5,  10,  10,   5,   5, -10,
-    -10,   0,  10,  10,  10,  10,   0, -10,
-    -10,  10,  10,  10,  10,  10,  10, -10,
     -10,   5,   0,   0,   0,   0,   5, -10,
+    -10,  10,  10,  10,  10,  10,  10, -10,
+    -10,   0,  10,  10,  10,  10,   0, -10,
+    -10,   5,   5,  10,  10,   5,   5, -10,
+    -10,   0,   5,  10,  10,   5,   0, -10,
+    -10,   0,   0,   0,   0,   0,   0, -10,
     -20, -10, -10, -10, -10, -10, -10, -20
 ]
 
 # Rook PST
 rook_table = [
-     0,   0,   0,   0,   0,   0,   0,   0,
+     0,   0,   0,   5,   5,   0,   0,   0,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
      5,  10,  10,  10,  10,  10,  10,   5,
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-     0,   0,   0,   5,   5,   0,   0,   0
+     0,   0,   0,   0,   0,   0,   0,   0
 ]
 
 # Queen PST
 queen_table = [
     -20, -10, -10,  -5,  -5, -10, -10, -20,
-    -10,   0,   0,   0,   0,   0,   0, -10,
-    -10,   0,   5,   5,   5,   5,   0, -10,
-     -5,   0,   5,   5,   5,   5,   0,  -5,
-      0,   0,   5,   5,   5,   5,   0,  -5,
-    -10,   5,   5,   5,   5,   5,   0, -10,
     -10,   0,   5,   0,   0,   0,   0, -10,
+    -10,   5,   5,   5,   5,   5,   0, -10,
+      0,   0,   5,   5,   5,   5,   0,  -5,
+     -5,   0,   5,   5,   5,   5,   0,  -5,
+    -10,   0,   5,   5,   5,   5,   0, -10,
+    -10,   0,   0,   0,   0,   0,   0, -10,
     -20, -10, -10,  -5,  -5, -10, -10, -20
 ]
 
 # King PST
 king_table = [
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -30, -40, -40, -50, -50, -40, -40, -30,
-    -20, -30, -30, -40, -40, -30, -30, -20,
-    -10, -20, -20, -20, -20, -20, -20, -10,
+     20,  30,  10,   0,   0,  10,  30,  20,
      20,  20,   0,   0,   0,   0,  20,  20,
-     20,  30,  10,   0,   0,  10,  30,  20
+    -10, -20, -20, -20, -20, -20, -20, -10,
+    -20, -30, -30, -40, -40, -30, -30, -20,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30
 ]
 
 # Combine into one dict
@@ -95,134 +94,170 @@ piece_square_tables = {
 }
 
 
-def evaluate_material(
-        board: chess.Board) -> int:  # This function calculates the material on the board and returns total score
+def evaluate_material(board: chess.Board) -> int:
+    """
+    Fast, robust material evaluation that works across python-chess versions.
+    Uses SquareSet.count() when available; falls back to int(...).bit_count().
+    """
     score = 0
-    for square in chess.SQUARES:  # Check each square on the board
-        piece = board.piece_at(square)
-        if piece:  # If there is a piece on that square
-            piece_value = piece_values[piece.piece_type]
-            if piece.color == chess.WHITE:
-                score += piece_value  # Add the value of the piece if it belongs to white
-            else:  # Piece belongs to black
-                score -= piece_value  # Subtract the value of the piece since not white's
+    for piece_type, value in piece_values.items():
+        # White count
+        try:
+            w_count = board.pieces(piece_type, chess.WHITE).count()
+        except Exception:
+            # older/newer variations might need casting to int
+            w_count = int(board.pieces(piece_type, chess.WHITE)).bit_count()
+
+        # Black count
+        try:
+            b_count = board.pieces(piece_type, chess.BLACK).count()
+        except Exception:
+            b_count = int(board.pieces(piece_type, chess.BLACK)).bit_count()
+
+        score += value * (w_count - b_count)
 
     return score
 
 
 def evaluate_piece_square_tables(board: chess.Board) -> int:
     score = 0
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece:
-            pst = piece_square_tables[piece.piece_type]
 
-            # For White, use square as-is; for Black, mirror vertically
-            if piece.color == chess.WHITE:
-                score += pst[square]
-            else:
-                mirrored_square = chess.square_mirror(square)
-                score -= pst[mirrored_square]
+    # piece_map() gives: {square: Piece}
+    for square, piece in board.piece_map().items():
+        pst = piece_square_tables[piece.piece_type]
+
+        if piece.color == chess.WHITE:
+            score += pst[square]
+        else:
+            score -= pst[chess.square_mirror(square)]
+
     return score
 
 
-def evaluate_pawn_structure(board):
+def evaluate_pawn_structure(board: chess.Board) -> int:
     score = 0
 
-    for color in [chess.WHITE, chess.BLACK]:
-        pawns = list(board.pieces(chess.PAWN, color))
-        enemy_pawns = list(board.pieces(chess.PAWN, not color))
-        files = {f: [] for f in range(8)}
+    # Fast bitboard getters
+    white_pawns = int(board.pieces(chess.PAWN, chess.WHITE))
+    black_pawns = int(board.pieces(chess.PAWN, chess.BLACK))
 
-        for sq in pawns:
-            files[chess.square_file(sq)].append(sq)
+    # File masks (1 bit in each square of a file)
+    FILE_MASKS = [int(chess.BB_FILES[i]) for i in range(8)]
 
-        # -------------------
-        # Doubled pawns
-        # -------------------
-        for f in range(8):
-            n = len(files[f])
-            if n > 1:
-                score += (-15 * (n - 1)) if color == chess.WHITE else (15 * (n - 1))
+    # --- Doubled and isolated pawns ---
+    for color, pawns, sign in [
+        (chess.WHITE, white_pawns, +1),
+        (chess.BLACK, black_pawns, -1),
+    ]:
+        for file_i in range(8):
+            file_mask = FILE_MASKS[file_i]
+            pawns_on_file = pawns & file_mask
 
-        # -------------------
-        # Isolated pawns
-        # -------------------
-        for f in range(8):
-            if len(files[f]) == 0:
+            if pawns_on_file == 0:
                 continue
-            left = files[f-1] if f > 0 else []
-            right = files[f+1] if f < 7 else []
-            if len(left) == 0 and len(right) == 0:
-                score += -20 if color == chess.WHITE else 20
 
-        # -------------------
-        # Passed pawns
-        # -------------------
-        for sq in pawns:
-            f = chess.square_file(sq)
-            r = chess.square_rank(sq)
-            passed = True
+            count = pawns_on_file.bit_count()
 
-            for ep in enemy_pawns:
-                ef = chess.square_file(ep)
-                er = chess.square_rank(ep)
-                if abs(ef - f) <= 1:
-                    if (color == chess.WHITE and er > r) or (color == chess.BLACK and er < r):
-                        passed = False
-                        break
+            # Doubled pawns
+            if count > 1:
+                score += sign * (count - 1) * (-20)
 
-            if passed:
-                advance = r if color == chess.WHITE else (7 - r)
-                bonus = 8 * advance
-                score += bonus if color == chess.WHITE else -bonus
+            # Isolated pawns
+            left = FILE_MASKS[file_i - 1] if file_i > 0 else 0
+            right = FILE_MASKS[file_i + 1] if file_i < 7 else 0
+            neighbors = pawns & (left | right)
 
-        # -------------------
-        # Hanging pawns (fixed)
-        # -------------------
-        for i in range(7):
-            if len(files[i]) > 0 and len(files[i+1]) > 0:
-                left_has = (i > 0 and len(files[i-1]) > 0)
-                right_has = (i+2 < 8 and len(files[i+2]) > 0)
-                if not left_has and not right_has:
-                    score += -15 if color == chess.WHITE else 15
+            if neighbors == 0:
+                score += sign * (-15)
+
+    # --- Passed pawns ---
+    # Precomputed masks for passed pawn checks:
+    for color, pawns, sign, forward_shift, enemy_pawns in [
+        (chess.WHITE, white_pawns, +1, 8, black_pawns),
+        (chess.BLACK, black_pawns, -1, -8, white_pawns),
+    ]:
+
+        temp = pawns
+        while temp:
+            sq = (temp & -temp).bit_length() - 1  # index of LSB
+            temp &= temp - 1
+
+            file = sq % 8
+
+            # Pawns in same file or adjacent files in front of this pawn (enemy)
+            mask = 0
+
+            # Build mask manually — cost is tiny (runs once per pawn)
+            for f in (file - 1, file, file + 1):
+                if 0 <= f < 8:
+                    for rank in range(8):
+                        target_sq = rank * 8 + f
+                        if (color == chess.WHITE and target_sq > sq) or \
+                           (color == chess.BLACK and target_sq < sq):
+                            mask |= 1 << target_sq
+
+            if enemy_pawns & mask == 0:
+                score += sign * 30  # passed pawn bonus
 
     return score
 
 def evaluate_bishop_pair(board: chess.Board) -> int:
     score = 0
-    for color in [chess.WHITE, chess.BLACK]:
-        bishops = list(board.pieces(chess.BISHOP, color))
-        if len(bishops) >= 2:
-            score += 30 if color == chess.WHITE else -30
-    return score
 
+    # White bishop count
+    w_bishops = int(board.pieces(chess.BISHOP, chess.WHITE)).bit_count()
+    if w_bishops >= 2:
+        score += 50
+
+    # Black bishop count
+    b_bishops = int(board.pieces(chess.BISHOP, chess.BLACK)).bit_count()
+    if b_bishops >= 2:
+        score -= 50
+
+    return score
 
 def evaluate_rook_files(board: chess.Board) -> int:
     score = 0
+
+    # Precompute pawn bitboards
+    white_pawns = int(board.pieces(chess.PAWN, chess.WHITE))
+    black_pawns = int(board.pieces(chess.PAWN, chess.BLACK))
+
+    # File bit masks (BB_FILES is already prepared by python-chess)
+    FILE_MASKS = [int(chess.BB_FILES[f]) for f in range(8)]
+
     for color in [chess.WHITE, chess.BLACK]:
-        rooks = list(board.pieces(chess.ROOK, color))
-        enemy_pawns = list(board.pieces(chess.PAWN, not color))
-        friendly_pawns = list(board.pieces(chess.PAWN, color))
-        for r_sq in rooks:
-            f = chess.square_file(r_sq)
-            # Pawns on this file
-            enemy_file_pawns = [p for p in enemy_pawns if chess.square_file(p) == f]
-            friendly_file_pawns = [p for p in friendly_pawns if chess.square_file(p) == f]
+        # Rooks for this side as bitboard
+        rooks = int(board.pieces(chess.ROOK, color))
+
+        # Pawn bitboards for logic
+        friendly_pawns = white_pawns if color == chess.WHITE else black_pawns
+        enemy_pawns = black_pawns if color == chess.WHITE else white_pawns
+
+        temp = rooks
+        while temp:
+            r_sq = (temp & -temp).bit_length() - 1  # pop LSB
+            temp &= temp - 1
+
+            f = r_sq % 8
+            file_mask = FILE_MASKS[f]
+
+            friendly_count = (friendly_pawns & file_mask).bit_count()
+            enemy_count = (enemy_pawns & file_mask).bit_count()
 
             # Open file: no pawns at all
-            if len(enemy_file_pawns) == 0 and len(friendly_file_pawns) == 0:
+            if friendly_count == 0 and enemy_count == 0:
                 score += 25 if color == chess.WHITE else -25
 
-            # Half-open file: no friendly pawns, at least one enemy pawn
-            elif len(friendly_file_pawns) == 0 and len(enemy_file_pawns) > 0:
+            # Half-open: no friendly pawns, at least one enemy pawn
+            elif friendly_count == 0 and enemy_count > 0:
                 score += 15 if color == chess.WHITE else -15
 
     return score
 
-
 def evaluate_knight_outposts(board: chess.Board) -> int:
     score = 0
+
     for color in [chess.WHITE, chess.BLACK]:
         knights = board.pieces(chess.KNIGHT, color)
         enemy_pawns = board.pieces(chess.PAWN, not color)
@@ -232,44 +267,43 @@ def evaluate_knight_outposts(board: chess.Board) -> int:
             f = chess.square_file(n_sq)
             r = chess.square_rank(n_sq)
 
-            # 1. Must be in enemy territory
+            # 1. Knight must be in enemy territory
             if color == chess.WHITE and r < 4:
                 continue
             if color == chess.BLACK and r > 3:
                 continue
 
-            # 2. Must not be attacked by enemy pawn
+            # 2. Knight must NOT be attacked by enemy pawn
             attacked = False
+            direction = 1 if color == chess.WHITE else -1
+            target_rank = r - direction  # enemy pawn must be on this rank
+
             for ep in enemy_pawns:
-                er = chess.square_rank(ep)
-                ef = chess.square_file(ep)
-                if color == chess.WHITE and (er + 1 == r) and abs(ef - f) == 1:
-                    attacked = True
-                    break
-                if color == chess.BLACK and (er - 1 == r) and abs(ef - f) == 1:
-                    attacked = True
-                    break
+                if chess.square_rank(ep) == target_rank:
+                    if abs(chess.square_file(ep) - f) == 1:
+                        attacked = True
+                        break
+
             if attacked:
                 continue
 
-            # 3. Must be supported by friendly pawn
+            # 3. Knight must be SUPPORTED by a friendly pawn
             supported = False
+            support_rank = r + direction  # friendly pawn must be here
+
             for fp in friendly_pawns:
-                fr = chess.square_rank(fp)
-                ff = chess.square_file(fp)
-                if color == chess.WHITE and (fr - 1 == r) and abs(ff - f) == 1:
-                    supported = True
-                if color == chess.BLACK and (fr + 1 == r) and abs(ff - f) == 1:
-                    supported = True
+                if chess.square_rank(fp) == support_rank:
+                    if abs(chess.square_file(fp) - f) == 1:
+                        supported = True
+                        break
 
             if not supported:
                 continue
 
-            # Award outpost bonus
+            # 4. Award bonus
             score += 20 if color == chess.WHITE else -20
 
     return score
-
 
 # Are we in the opening, middlegame, or endgame?
 
@@ -377,89 +411,92 @@ def evaluate_king(board: chess.Board) -> int:
 
 
 def evaluate_mobility(board: chess.Board) -> int:
-    white_score = 0
-    black_score = 0
-
-    # 16-square center (better than just 4 squares)
-    central_squares = {
+    # ----------------------------
+    # Precompute static sets once
+    # ----------------------------
+    CENTRAL_SQUARES = frozenset((
         chess.C3, chess.D3, chess.E3, chess.F3,
         chess.C4, chess.D4, chess.E4, chess.F4,
         chess.C5, chess.D5, chess.E5, chess.F5,
         chess.C6, chess.D6, chess.E6, chess.F6
-    }
+    ))
 
+    MAIN_CENTER = frozenset((chess.E4, chess.D4, chess.E5, chess.D5))
+
+    # ----------------------------
+    # Precompute once per call
+    # ----------------------------
     opening_phase = 1.0 if board.fullmove_number <= 6 else 0.0
+    pieces = board.piece_map()
+    moves = list(board.legal_moves)
 
-    for move in board.legal_moves:
-        piece = board.piece_at(move.from_square)
-        if not piece:
+    # Localize variables for speed
+    central_squares = CENTRAL_SQUARES
+    main_center = MAIN_CENTER
+    op_phase = opening_phase
+
+    white_score = 0
+    black_score = 0
+
+    # ----------------------------
+    # Fast local references
+    # ----------------------------
+    PAWN = chess.PAWN
+    KNIGHT = chess.KNIGHT
+    BISHOP = chess.BISHOP
+    ROOK = chess.ROOK
+    QUEEN = chess.QUEEN
+    KING = chess.KING
+    WHITE = chess.WHITE
+
+    for mv in moves:
+        frm = mv.from_square
+        piece = pieces.get(frm)
+        if piece is None:
             continue
 
-        pts = 0
+        ptype = piece.piece_type
+        color_is_white = piece.color  # bool
 
-        # ------------------------------
-        # PAWNS
-        # ------------------------------
-        if piece.piece_type == chess.PAWN:
+        to_sq = mv.to_square
+
+        # -------------
+        # Piece scoring
+        # -------------
+        if ptype == PAWN:
             pts = 5
-
-            # reward central pawn pushes (very important in small engines)
-            if move.to_square in {chess.E4, chess.D4, chess.E5, chess.D5}:
-                pts += 25 * opening_phase  # strong push for e4/d4
-
-            # reward moving toward center
-            if move.to_square in central_squares:
+            if to_sq in main_center:
+                pts += 25 * op_phase
+            if to_sq in central_squares:
                 pts += 10
 
-        # ------------------------------
-        # KNIGHTS
-        # ------------------------------
-        elif piece.piece_type == chess.KNIGHT:
-            pts = 4
+        elif ptype == KNIGHT:
+            pts = 4 - 6 * op_phase
 
-            # Opening penalty: knights are OK but not e4-good
-            pts -= 6 * opening_phase
-
-        # ------------------------------
-        # BISHOPS
-        # ------------------------------
-        elif piece.piece_type == chess.BISHOP:
+        elif ptype == BISHOP:
             pts = 6
 
-        # ------------------------------
-        # ROOKS
-        # ------------------------------
-        elif piece.piece_type == chess.ROOK:
-            pts = 4  # weaker early
+        elif ptype == ROOK:
+            pts = 4 + (2 if op_phase == 0 else 0)
 
-            # midgame development bonus
-            if not opening_phase:
-                pts += 2
+        elif ptype == QUEEN:
+            pts = 2 + (6 if op_phase == 0 else 0)
 
-        # ------------------------------
-        # QUEEN
-        # ------------------------------
-        elif piece.piece_type == chess.QUEEN:
-            pts = 2  # very low early to avoid early queen moves
-
-            # in middlegame queen mobility matters more
-            if not opening_phase:
-                pts += 6
-
-        # ------------------------------
-        # KING (rarely counts)
-        # ------------------------------
-        elif piece.piece_type == chess.KING:
+        elif ptype == KING:
             pts = 1
 
-        # accumulate score
-        if piece.color == chess.WHITE:
+        else:
+            continue
+
+        # -------------
+        # Accumulate
+        # -------------
+        if color_is_white:
             white_score += pts
         else:
             black_score += pts
 
     return white_score - black_score
-
 
 def evaluate_center_control(board: chess.Board) -> int:
     score = 0
@@ -535,7 +572,7 @@ def evaluate(board: chess.Board) -> int:
     score += w_pst * evaluate_piece_square_tables(board)  # scale by phase
     score += w_pawn_structure * evaluate_pawn_structure(board)  # static enough
     score += w_bishop_pair * evaluate_bishop_pair(board)  # usually static
-    score += w_knight_outposts * evaluate_knight_outposts(board)  # static enough
+  # score += w_knight_outposts * evaluate_knight_outposts(board) - REMOVED, low elo gains and adds time complexity (can uncomment out later maybe)
     score += w_rook_files * evaluate_rook_files(board)  # static enough
     score += w_king_safety * evaluate_king(board)  # king safety changes entirely in endgame
     score += w_mobility * evaluate_mobility(board)  # mobility matters more in middlegame

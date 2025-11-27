@@ -297,24 +297,29 @@ class MinimaxBot:
 
         return victim_val - attacker_val
 
-    def order_key(self, board: chess.Board, move: chess.Move) -> tuple:
+   def order_key(self, board: chess.Board, move: chess.Move) -> tuple:
         is_cap = board.is_capture(move)
         vv = self.victim_value(board, move)
         promo = 1 if move.promotion else 0
         gives_check = 1 if board.gives_check(move) else 0
 
-        """killer_bonus = 0
-        if killer1 and move == killer1:
-            killer_bonus = 1
-        elif killer2 and move == killer2:
-            killer_bonus = 1
+        center_bonus = 0
 
-        hist_bonus = 0
-        if history is not None:
-            hist_bonus = history.get((board.turn, move.from_square, move.to_square), 0)"""
+    # Always fetch the piece first (safe)
+        piece = board.piece_type_at(move.from_square)
 
-        # Sort high -> low
-        return (is_cap, vv + promo * 50, gives_check)
+    # Only apply center/dev bonuses on quiet moves
+        if not is_cap:
+            if piece == chess.PAWN:
+                if move.to_square in [chess.E4, chess.D4, chess.E5, chess.D5]:
+                    center_bonus = 8  # small center preference
+
+        elif piece == chess.KNIGHT:
+            if move.to_square in [chess.F3, chess.C3, chess.F6, chess.C6]:
+                center_bonus = 2  # tiny dev bonus
+
+    # Sort high -> low
+        return (is_cap, vv + promo * 50, gives_check, center_bonus)
 
     def _see_piece_val(self, board: chess.Board, sq: int) -> int:
         p = board.piece_at(sq)

@@ -297,7 +297,7 @@ class MinimaxBot:
 
         return victim_val - attacker_val
 
-   def order_key(self, board: chess.Board, move: chess.Move) -> tuple:
+    def order_key(self, board: chess.Board, move: chess.Move) -> tuple:
         is_cap = board.is_capture(move)
         vv = self.victim_value(board, move)
         promo = 1 if move.promotion else 0

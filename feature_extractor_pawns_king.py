@@ -43,6 +43,9 @@ class PawnFeatureExtractor:
         self.features = [0 for _ in range(self.feature_count)]
         self.game_stage = game_stage
 
+    def set_board(self, board):
+        self.board = board
+
     def passed_pawns(self):
         white_pawns = self.board.pieces(chess.PAWN, chess.WHITE)
         white_passed_pawns = 0
@@ -162,6 +165,9 @@ class KingFeatureExtractor:
     def __init__(self, board: chess.Board, game_stage: int):
         self.board = board
         self.game_stage = game_stage
+
+    def set_board(self, board):
+        self.board = board
 
     def pawn_shield(self) -> int:
         def shield(color: chess.Color) -> int:
@@ -285,3 +291,5 @@ def run_csv(csv_path, n_rows=20):
 
 if __name__ == "__main__":
     run_csv(CSV_PATH, N_ROWS)
+
+

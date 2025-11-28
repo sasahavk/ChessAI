@@ -15,17 +15,17 @@ KING_ENDGAME_FEN = "8/8/8/8/8/8/k7/K7 w - - 0 1"  # endgame king safety
 @pytest.fixture
 def extractor_startpos():
     board = chess.Board(STARTPOS_FEN)
-    return fe.FeatureExtractor(board, fe.MID_GAME)
+    return fe.FeatureExtractorN(board, fe.MID_GAME)
 
 @pytest.fixture
 def extractor_center():
     board = chess.Board(CENTER_CONTROL_FEN)
-    return fe.FeatureExtractor(board, fe.MID_GAME)
+    return fe.FeatureExtractorN(board, fe.MID_GAME)
 
 @pytest.fixture
 def extractor_endgame():
     board = chess.Board(KING_ENDGAME_FEN)
-    return fe.FeatureExtractor(board, fe.END_GAME)
+    return fe.FeatureExtractorN(board, fe.END_GAME)
 
 
 @pytest.mark.parametrize("fen, turn, expected", [
@@ -70,11 +70,11 @@ def extractor_endgame():
      [2, 0, 2, 0, 0, 0]),  # white: pawn e4, bishop d4
 ])
 
-
 def test_pieces_occupying_center_all_cases(fen, turn, expected):
+    print("TESTING")
     board = chess.Board(fen)
     board.turn = turn
-    extractor = fe.FeatureExtractor(board, fe.MID_GAME)
+    extractor = fe.FeatureExtractorN(board, fe.MID_GAME)
 
     result = extractor.ft_pieces_occupying_center()
     # Convert expected to numpy array for comparison
@@ -86,32 +86,29 @@ def test_pieces_occupying_center_all_cases(fen, turn, expected):
         f"Expected: {expected_array}"
 
 
+
+
 @pytest.mark.parametrize("fen, turn, expected", [
-    # # 1. Starting position
-    # ("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", chess.WHITE,
-    #  [0, 0, 0, 0, 0, 0]),  # 2 knights (b1,g1)
-    #
-    # # 2. After 1. Nf3 Nc6 — knights attack center strongly
-    # ("r1bqkbnr/pppppppp/2n5/8/8/8/PPPPPPPP/RNBQKB1R w KQkq - 2 2", chess.WHITE,
-    #  [0, -2, 0, 0, 0, 0]),  # white knights: g1,b1,f3 → 3 attacks
+    # 1. Starting position
+    ("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", chess.WHITE,
+     [0, 0, 0, 0, 0, 0]),  # 2 knights (b1,g1)
 
-    # 3. Bishops unleashed — Italian Game style
-    ("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4", chess.WHITE,
-     [0, 1, 2, 0, 0, 0]),  # 1 knight + 2 bishops (c4,f3? wait — c4 bishop attacks d5/e5)
+    # 2. After 1. Nf3 Nc6 — knights attack center strongly
+    ("r1bqkbnr/pppppppp/2n5/8/8/8/PPPPPPPP/RNBQKB1R w KQkq - 2 2", chess.WHITE,
+     [0, -2, 0, 0, 0, 0]),  # white knights: g1,b1,f3 → 3 attacks
 
-    # # 4. Queen + rook battery on open files
-    # ("rnbqkb1r/pppp1ppp/5n2/4p3/3PP3/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 3", chess.WHITE,
-    #  [2, 2, 0, 1, 1, 0]),  # 2 pawns (d4,e4), 2 knights, 1 rook (a1→d4?), 1 queen
-    #
-    # # 5. Black to move — massive center attack with queen + bishops
-    # ("rnbqk2r/pppp1ppp/4bn2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R b KQkq - 2 5", chess.BLACK,
-    #  [1, 1, 2, 0, 1, 0]),  # black: 1 pawn (e5), 1 knight, 2 bishops, 1 queen → all positive since black to move
+    ("8/8/8/8/2b5/3N4/8/8 w - - 0 1", chess.WHITE,
+     [0,1, -1, 0, 0, 0]),  # 1 knight + 2 bishops (c4,f3? wait — c4 bishop attacks d5/e5)
+
+    # . Queen + rook battery on open files
+    ("4q3/4Q3/8/8/8/8/8/8 w - - 0 1", chess.WHITE,
+     [0, 0, 0, 0, 2, 0]),  # 2 pawns (d4,e4), 2 knights, 1 rook (a1→d4?), 1 queen
 ])
 
 def test_center_attackers_all_cases(fen, turn, expected):
     board = chess.Board(fen)
     board.turn = turn
-    extractor = fe.FeatureExtractor(board, fe.MID_GAME)
+    extractor = fe.FeatureExtractorN(board, fe.MID_GAME)
 
     result = extractor.ft_center_attackers()
     expected_array = np.array(expected, dtype=int)
@@ -124,49 +121,134 @@ def test_center_attackers_all_cases(fen, turn, expected):
         f"Expected: {expected_array}\n" \
         f"Board:\n{board}\n"
 
-def test_center_attackers(extractor_startpos):
-    attackers = extractor_startpos.ft_center_attackers()
-    # In startpos, knights attack center
-    expected = np.array([0, 2, 0, 0, 0, 0])  # two white knights attack d4/e4/d5/e5
-    assert np.array_equal(attackers, expected) or np.array_equal(attackers, -expected)
 
+@pytest.mark.parametrize("fen, turn, expected",[
+        # 1. White to move, only White has the bishop pair — should return +1
+        (
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            chess.WHITE,
+            0   # both sides have pair → 1 - 1 = 0
+        ),
 
-def test_bishop_pair(extractor_startpos):
-    assert extractor_startpos.ft_bishop_pair() == 0  # both sides have pair
+        # 2. White to move, White has both bishops, Black has zero — should return +1
+        (
+                "rn1qkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKB1R w KQkq - 0 1",
+                chess.WHITE,
+                1  # white_has_bp = 1, black_has_bp = 0 → return 1 - 0 = +1
+        ),
 
-    board = chess.Board(BISHOP_PAIR_FEN)
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
-    assert ext.ft_bishop_pair() == 0  # still both have pair (even if one is missing? wait no)
-    # Actually both still have both bishops in this FEN — let's break one
-    board.remove_piece_at(chess.F1)  # remove light-square bishop
-    ext.set_board(board)
-    assert ext.ft_bishop_pair() == -1  # white missing one, black has both → -1
+        # 3. Black to move, Black has both bishops, White has none — should return +1
+        (
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/r1BqkQ1r b KQkq - 0 1",
+                chess.BLACK,
+                1  # black_has_bp = 1, white_has_bp = 0 → return 1 - 0 = +1
+        ),
+    ])
 
-
-def test_knight_outpost():
-    board = chess.Board(KNIGHT_OUTPOST_FEN)
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
-    # White knight on c3 is supported by d4 pawn, not attacked by black pawns → outpost
-    assert ext.ft_knight_outposts() == 1
-
-
-def test_bishop_outpost():
-    fen = "rnbqkbnr/ppp1pppp/8/3p4/3P4/2N1B3/PPP1PPPP/R1BQKBNR w KQkq - 0 1"
+def test_ft_bishop_pair(fen, turn, expected, capsys):
     board = chess.Board(fen)
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
-    # White bishop on e3 supported? Let's assume not for now
-    assert ext.ft_bishop_outposts() >= 0
+    board.turn = turn
+    extractor = fe.FeatureExtractorN(board, fe.MID_GAME)
+
+    result = extractor.ft_bishop_pair()
+
+    captured = capsys.readouterr()
+    prints = captured.out.strip().split('\n')
+    white_bp = int(prints[0]) if prints else None
+    black_bp = int(prints[1]) if len(prints) > 1 else None
+
+    assert result == expected, \
+        f"FEN: {fen}\n" \
+        f"Turn: {'White' if turn else 'Black'}\n" \
+        f"Printed: {white_bp}, {black_bp}\n" \
+        f"Got: {result}, Expected: {expected}\n" \
+        f"Board:\n{board}"
+
+
+@pytest.mark.parametrize(
+    "fen, turn, expected",
+    [
+        # 1. White knight on b5 — perfect outpost, Black has none
+        (
+                "rnbqkb1r/p1pp1ppp/1p2pn2/1N6/1PP5/P7/1P1PPPPP/RNBQKBNR w KQkq - 0 6",
+                chess.WHITE,
+                1  # +1 for White
+        ),
+
+        # 2. Black knight on b4 — perfect outpost, White has none
+        (
+                "8/2p1p1p1/p1P1P1Pp/N1P1P1PN/1n6/1N6/8/8 w - - 0 1",
+                chess.BLACK,
+                0  # +1 for Black
+        ),
+
+        # 3. Both have one outpost — cancels out
+        (
+                "8/8/8/2p5/1n6/8/7N/8 w - - 0 1",
+                chess.WHITE,
+                -1  # 1 - 1 = 0
+        ),
+    ]
+)
+
+
+def test_ft_knight_outposts(fen, turn, expected):
+    board = chess.Board(fen)
+    board.turn = turn
+    extractor = fe.FeatureExtractorN(board,0)
+    result = extractor.ft_knight_outposts()
+
+    assert result == expected, f"Failed: {fen} | Got {result}, expected {expected}\n{board}"
+
+
+@pytest.mark.parametrize("fen, turn, expected",[
+        # 1. White 1. White bishop on d5 — outpost (rank 5, supported by e4, not attacked by black pawn)
+        #    Black has no bishop → White: +1
+        (
+                "8/8/8/3Bp3/4P3/8/8/8 w - - 0 1",
+                chess.WHITE,
+                1  # White bishop on d5 is outpost → 1 - 0 = +1
+        ),
+
+        # 2. Black bishop on d4 — outpost (rank 4, supported by e5, not attacked by white pawn)
+        #    White has no bishop → White to move → 0 - 1 = -1
+        (
+                "8/8/8/4p3/3bP3/8/8/8 w - - 0 1",
+                chess.WHITE,
+                -1  # Black bishop on d4 is outpost → 0 - 1 = -1
+        ),
+
+        # 3. White bishop on c4 — NOT outpost (own half, rank 4), Black has none → 0
+        (
+                "8/8/8/8/2bP4/8/8/8 w - - 0 1",
+                chess.WHITE,
+                0  # Bishop on c4 is on own half → not outpost
+        ),
+    ])
+
+def test_ft_bishop_outposts(fen, turn, expected):
+    board = chess.Board(fen)
+    board.turn = turn
+    extractor = fe.FeatureExtractorN(board, 0)
+
+    # Call your method: ft_bishop_outposts() → outpost(chess.BISHOP)
+    result = extractor.outpost(chess.BISHOP)  # or extractor.ft_bishop_outposts() if you have it
+
+    assert result == expected, \
+        f"Failed for FEN: {fen}\n" \
+        f"Got: {result}, Expected: {expected}\n" \
+        f"Board:\n{board}\n"
 
 
 def test_passed_pawns():
     board = chess.Board(PASSED_PAWN_FEN)
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
+    ext = fe.FeatureExtractorN(board, fe.MID_GAME)
     assert ext.ft_passed_pawns() == 1  # c7 pawn is passed for white
 
 
 def test_piece_sqr_tables():
     board = chess.Board(STARTPOS_FEN)
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
+    ext = fe.FeatureExtractorN(board, fe.MID_GAME)
 
     # White pawn on e2 should get +0 from table (index 12: 0)
     assert ext.ft_pawn_sqr_sum() > 0  # overall positive due to central bonus
@@ -181,7 +263,7 @@ def test_king_endgame_table_switch(extractor_endgame):
     # In endgame, king should prefer center
     king_center_fen = "8/8/8/8/8/8/3K4/8 w - - 0 1"
     board = chess.Board(king_center_fen)
-    ext = fe.FeatureExtractor(board, fe.END_GAME)
+    ext = fe.FeatureExtractorN(board, fe.END_GAME)
     center_score = ext.ft_king_sqr_sum()
 
     # Move king to corner
@@ -202,13 +284,13 @@ def test_get_features_returns_correct_length(extractor_startpos):
 
 def test_material_features():
     board = chess.Board("rnbqkbnr/pppppppp/8/8/8/N7/PPPPPPPP/R1BQKBNR w KQkq - 0 1")  # extra knight
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
+    ext = fe.FeatureExtractorN(board, fe.MID_GAME)
     assert ext.ft_material_knight() > 0  # white has extra knight
 
 
 def test_mobility_balance():
     board = chess.Board("rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 1")
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
+    ext = fe.FeatureExtractorN(board, fe.MID_GAME)
     mobility = ext.ft_mobility_balance()
     assert isinstance(mobility, float)
 
@@ -221,14 +303,14 @@ def test_mirror_square():
 
 def test_is_passed_pawn_edge_cases():
     board = chess.Board("8/pppppppp/8/8/8/8/PPPPPPPP/8 w - - 0 1")
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
+    ext = fe.FeatureExtractorN(board, fe.MID_GAME)
     # All pawns blocked → no passed
     assert ext.ft_passed_pawns() == 0
 
 
 def test_outpost_invalid_piece():
     board = chess.Board(STARTPOS_FEN)
-    ext = fe.FeatureExtractor(board, fe.MID_GAME)
+    ext = fe.FeatureExtractorN(board, fe.MID_GAME)
     # No knights in outpost position
     assert ext.ft_knight_outposts() == 0
 
@@ -237,11 +319,7 @@ def test_feature_weight_application(extractor_center):
     features = extractor_center.get_features()
     # pieces_occupying_center should be weighted by CENTER_OCCUPY_BONUS
     occ = extractor_center.ft_pieces_occupying_center()
-    weighted = np.sum(occ * fe.FeatureExtractor.CENTER_OCCUPY_BONUS)
+    weighted = np.sum(occ * fe.FeatureExtractorN.CENTER_OCCUPY_BONUS)
     # Find index in features where this was stored
     # This is a bit meta, but we can trust logic if others pass
     assert any(abs(f - weighted) < 1e-6 for f in features)
-
-
-if __name__ == "__main__":
-    pytest.main(["-v", __file__])

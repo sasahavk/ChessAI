@@ -16,7 +16,6 @@ power_levels = 10
 def win_result_scaled_tempo(pos, opp_power):
     win_score = 1*(1.5**(opp_power-1))
 
-    win_score_old = win_score
     if pos < 10:
         win_score += win_score*0.1
     elif pos <= 40:
@@ -33,7 +32,6 @@ def win_result_scaled(opp_power):
 
 def draw_result_scaled(opp_power):
     return (1 * 1.5 ** (opp_power - 1))/2
-
 
 
 class ChessSimulator:
@@ -167,7 +165,7 @@ class ChessSimulator:
         self.quit_engines()
 
 
-simulator = ChessSimulator(10,5, "games_new_two.csv", 40)
+simulator = ChessSimulator(10, 50, "positions.csv", 40)
 simulator.generate_positions()
 
 

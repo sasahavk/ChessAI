@@ -87,39 +87,40 @@ MID_GAME = 1
 END_GAME = 2
 
 feature_weights = {
-    "pieces_occupying_center": CENTER_OCCUPY_BONUS,
-    "center_attackers": CENTER_ATTACK_WEIGHTS,
-    "bishop_pair": BISHOP_PAIR_WEIGHT,
-    "knight_outposts":KNIGHT_OUTPOST_WEIGHT,
+    "attack_balance": 0,
     "bishop_outposts": BISHOP_OUTPOST_WEIGHT,
-    "pawn_sqr_sum": 0,
+    "bishop_pair": BISHOP_PAIR_WEIGHT,
     "bishop_sqr_sum": 0,
-    "knight_sqr_sum": 0,
-    "rook_sqr_sum": 0,
-    "queen_sqr_sum": 0,
+    "center_attackers": CENTER_ATTACK_WEIGHTS,
+    "connected_pawns": kpfe.CONNECTED_PAWN_WEIGHT,
+    "defense_balance": 0,
+    "doubled_pawns": kpfe.DOUBLED_PAWN_WEIGHT,
+    "half_open_king_files": kpfe.HALF_OPEN_KING_FILES_PEN,
+    "isolated_pawns": kpfe.ISOLATED_PAWN_WEIGHT,
+    "king_ring_enemy_pressure": kpfe.KING_RING_PRESSURE_WEIGHT,
     "king_sqr_sum": 0,
-    "passed_pawns": kpfe.PASSED_PAWN_WEIGHT,
-    "doubled_pawns":kpfe.DOUBLED_PAWN_WEIGHT,
-    "isolated_pawns":kpfe.ISOLATED_PAWN_WEIGHT,
-    "connected_pawns":kpfe.CONNECTED_PAWN_WEIGHT,
-    "pawn_shield":kpfe.KING_SHIELD_WEIGHT,
-    "half_open_king_files":kpfe.HALF_OPEN_KING_FILES_PEN,
-    "king_ring_enemy_pressure":kpfe.KING_RING_PRESSURE_WEIGHT,
-    "material_pawn": 0,
+    "knight_outposts": KNIGHT_OUTPOST_WEIGHT,
+    "knight_sqr_sum":0,
     "material_bishop": 0,
     "material_knight": 0,
+    "material_pawn": 0,
+    "material_queen": 0,
     "material_rook": 0,
-    "material_queen": 0, 
-    # "material_king": 0,
-    "mobility_balance": 0, 
+    "mobility_balance": 0,
     "mobility_safe_balance": 0,
-    "attack_balance": 0, 
+    "passed_pawns": kpfe.PASSED_PAWN_WEIGHT,
+    "pawn_shield": kpfe.KING_SHIELD_WEIGHT,
+    "pawn_sqr_sum": 0,
+    "pieces_occupying_center": CENTER_OCCUPY_BONUS,
+    "queen_sqr_sum": 0,
+    "rook_sqr_sum": 0,
     "threat_balance": 0,
-    "defense_balance": 0,
 }
 
 
-class FeatureExtractor:
+
+
+class FeatureExtractorN:
     def __init__(self, board: chess.Board, game_stage: int):
         self.board = board
         self.feature_count = 40 # TODO: ADJUST TO INCLUDE ALL FEATURES
@@ -131,11 +132,13 @@ class FeatureExtractor:
 
     def set_board(self, board: chess.Board):
         self.board = board
+        self.material_extractor.set_board(board)
+        self.pawn_extractor.set_board(board)
+        self.king_extractor.set_board(board)
 
     # count and subtract number of white vs black pieces occupying the center
     def ft_pieces_occupying_center(self) -> np.array:
         pieces_occupy_center = np.array([0 for _ in range(6)])
-        print("TURN ", self.board.turn)
         for sq in CENTER:
             if self.board.piece_at(sq):
                 if self.board.piece_at(sq).color == chess.WHITE:
@@ -148,6 +151,7 @@ class FeatureExtractor:
                         pieces_occupy_center[self.board.piece_at(sq).piece_type-1] += 1
                     else:
                         pieces_occupy_center[self.board.piece_at(sq).piece_type-1] -= 1
+
         return pieces_occupy_center
 
     #  count and subtract number of white vs black pieces attacking the center
@@ -162,7 +166,6 @@ class FeatureExtractor:
             for sq in self.board.attackers(chess.WHITE, target):
                 piece = self.board.piece_at(sq)
                 attack_counts[1][piece.piece_type - 1] += 1
-
         if self.board.turn == chess.WHITE:
             return np.subtract(attack_counts[1], attack_counts[0])
         return np.subtract(attack_counts[0], attack_counts[1])
@@ -188,6 +191,7 @@ class FeatureExtractor:
             if self.is_outpost(sqr, chess.BLACK, piece_type):
                 black_outpost += 1
 
+        print(white_outpost, black_outpost)
         if self.board.turn == chess.WHITE:
             return white_outpost - black_outpost
         return black_outpost - white_outpost
@@ -356,19 +360,17 @@ class FeatureExtractor:
 
     def get_features(self):
         i = 0
-        for name, method in sorted(inspect.getmembers(self, predicate=inspect.ismethod)):
+        for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
             if not name.startswith("ft_"): continue
             vec = method()
-
+            # print(name[3:], type(vec))
             if name.endswith("pieces_occupying_center") or name.endswith("center_attackers"):
-                self.features[i] = np.sum(vec*feature_weights[name[3:]]).item()
+                self.features[i] = np.sum(vec* feature_weights[name[3:]]).item()
             elif isinstance(vec, int):
                 if feature_weights[name[3:]] == 0:
                     self.features[i] = vec
                 else:
                     self.features[i] = vec * feature_weights[name[3:]]
-            elif isinstance(vec, (list,int)) and feature_weights[name[3:]] == 0:
-                self.features[i] = sum(vec)
             i += 1
         return self.features[:i]
 
@@ -376,14 +378,52 @@ class FeatureExtractor:
 def mirror_square(sq: int) -> int:
     return ((7 - (sq // 8)) * 8) + (sq % 8)
 
-# fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-# fe = FeatureExtractor(chess.Board(fen), 0)
-# print(fe.get_features())
+
+def write_features_file(input_file='positions.csv',output_file='positions_with_features.csv',):
+    fe = FeatureExtractorN(chess.Board(), 0)
+    feature_names = list(feature_weights.keys())
+    feature_names.sort()
+    with open(input_file, 'r', encoding='utf-8') as src, open(output_file, 'w', encoding='utf-8', newline='') as dst:
+        header = src.readline().rstrip('\n')
+        dst.write(header + ',' + ','.join(feature_names) + '\n')
+
+        for line in src:
+            line = line.rstrip('\n')
+            if not line.strip():
+                continue
+
+            parts = line.split(',', 1)
+            fen = parts[0]
+            rest = parts[1] if len(parts) > 1 else ""
+
+            fe.set_board(chess.Board(fen))
+            features = fe.get_features()
+
+            if len(features) != len(feature_names):
+                raise ValueError(
+                    f"FeatureExtractor returned {len(features)} values, "
+                    f"but feature_weights has {len(features)} keys"
+                )
+
+            feat_str = ','.join(map(str, features))
+
+            dst.write(f"{fen},{rest},{feat_str}\n")
+
+    print("DONE")
+
+
+write_features_file()
+
+# fens = [
+# "b6b/r6r/q6q/8/8/8/8/8 w KQkq - 0 1",
+# # "rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1",
+# # "rnbqkbnr/pppp1ppp/4p3/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2",
+# # "rnbqkbnr/pppp1ppp/4p3/8/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 0 2",
+# # "rnbqk1nr/ppppbppp/4p3/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 1 3",
+# ]
 #
-# fen2 = "r1b1k1nr/p2p1ppp/2nPpb2/qpp1P3/8/5N2/PPP1QPPP/RNB1KB1R w KQkq - 1 8"
-# fe.set_board(chess.Board(fen2))
-# print(fe.get_features())
+# fe = mfe.MaterialFeatureExtractor(chess.Board(), 0)
+# for i in range(len(fens)):
+#     fe.set_board(chess.Board(fens[i]))
 #
-# fen3 = "6k1/p4p2/2pN3p/8/r7/7P/5PPK/8 w - - 4 38"
-# fe.set_board(chess.Board(fen3))
-# print(fe.get_features())
+#     print(fe.get_features())

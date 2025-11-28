@@ -15,10 +15,17 @@ def play_selfplay():
     moves = 0
 
     while not board.is_game_over() and moves < 200:
+        timeStart = time.time()
+        
         mv = bot.play(board)
         board.push(mv)
         moves += 1
         print(board, "\n")
+
+        timeEnd = time.time()
+        timeTaken = timeEnd - timeStart
+        print(f"Time taken for move:  {timeTaken} seconds")
+        print("===================")
 
     return board.result(), moves
 
@@ -41,4 +48,7 @@ def run_matches(n=5, csv_path="results.csv"):
 
 
 if __name__ == "__main__":
-    run_matches()
+    run_matches(n=5)
+
+
+

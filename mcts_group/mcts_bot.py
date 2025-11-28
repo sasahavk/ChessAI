@@ -37,13 +37,15 @@ class Node:
 	
 
 class MonteCarloSearchTreeBot:
-	def __init__(self, numRootSimulations:int, maxSimDepth:int, evalFunc=None):
+	def __init__(self, numRootSimulations:int, maxSimDepth:int, evalFunc=None, rememberPastBoardScores:bool=True):
 		self.numRootSimulations	:int = numRootSimulations	
 		self.maxSimDepth:int = maxSimDepth
 		self.evalFunc = backupEvalFunc if (evalFunc == None) else evalFunc
 		self.color:bool = None
+		self.rememberPastBoardScores:bool = rememberPastBoardScores
+		self.boardScores:dict = {}
 
-	def play(self, board:chess.Board) -> chess.Move:
+	def play(self, board:chess.Board) -> chess.Move:		
 		self.color = board.turn
 		root:Node = Node(board)
 
@@ -52,7 +54,7 @@ class MonteCarloSearchTreeBot:
 			leaf:Node = self.applyTreePolicy(root)
 
 			# Simulation
-			result:int = self.rollout(leaf)
+			result:int = self.rollout(leaf) if not (board.fen() in self.boardScores) else self.boardScores[board.fen()]
 
 			# Backpropagation
 			self.backpropagate(leaf, result)
@@ -101,6 +103,10 @@ class MonteCarloSearchTreeBot:
 		while currentNode != None:
 			currentNode.visits += 1
 			currentNode.score = score
+			
+			if rememberPastBoardScores:
+				self.boardScores.update({currentNode.board.fen(): score})
+			
 			currentNode = currentNode.parent
 
 def backupEvalFunc(board:chess.Board) -> int:

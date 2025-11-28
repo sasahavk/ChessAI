@@ -104,7 +104,7 @@ class MonteCarloSearchTreeBot:
 			currentNode.visits += 1
 			currentNode.score = score
 			
-			if rememberPastBoardScores:
+			if self.rememberPastBoardScores:
 				self.boardScores.update({currentNode.board.fen(): score})
 			
 			currentNode = currentNode.parent

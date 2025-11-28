@@ -21,6 +21,7 @@ DARK_SQ = (181, 136, 99)
 HILITE_RGBA = (255, 255, 0, 90)
 
 STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
+STOCKFISH_ELO = 1320
 
 # How long to display result screen (ms)
 RESULT_DISPLAY_MS = 2500
@@ -75,7 +76,7 @@ class ChessGame:
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1800})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
 
@@ -446,7 +447,7 @@ def run_batch(num_games=10):
 
         game = ChessGame(
             white_player="stockfish",
-            black_player="minimax",
+            black_player="mcts",
             minimax_depth=4,
             flip_board=False,  # or True; see part 2
         )
@@ -472,11 +473,11 @@ def run_batch(num_games=10):
 
 
 def main():
-    # Choose players per side: "human", "minimax", or "stockfish"
+    # Choose players per side: "human", "minimax", "mcts", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
-    #game.play()
-    run_batch(num_games=100)
+    game = ChessGame(white_player="human", black_player="mcts", minimax_depth=4)
+    game.play(render=True)
+    # run_batch(num_games=5)
 
 if __name__ == "__main__":
     main()

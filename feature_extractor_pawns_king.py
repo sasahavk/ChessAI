@@ -292,4 +292,3 @@ def run_csv(csv_path, n_rows=20):
 if __name__ == "__main__":
     run_csv(CSV_PATH, N_ROWS)
 
-

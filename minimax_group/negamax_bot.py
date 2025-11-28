@@ -5,10 +5,12 @@ from enum import Enum, auto
 import hashlib
 from chess.polyglot import zobrist_hash as poly_zobrist_hash
 
+
 class TTFlag(Enum):
     EXACT = auto()
     LOWERBOUND = auto()
     UPPERBOUND = auto()
+
 
 @dataclass
 class TTEntry:
@@ -16,6 +18,7 @@ class TTEntry:
     value: float
     flag: TTFlag
     move: chess.Move | None
+
 
 TT_MAX = 200000
 
@@ -35,12 +38,12 @@ SEE_PRUNE_MARGIN = 50  # 0.5 pawn; tune 0..100
 
 MATE_SCORE = 1000000
 
-class MinimaxBot:
-    def __init__(self, depth=6, eval_fn=None, use_null_move_pruning=True):
+
+class NegamaxBot:
+    def __init__(self, depth=6, eval_fn=None):
         self.depth = depth
         self.eval_fn = eval_fn  # evaluate(board) returns + for white, - for black
         self.tt: dict[int, TTEntry] = {}
-        self.use_null_move_pruning = use_null_move_pruning
 
     def preferred_first(self, moves: list[chess.Move], preferred: chess.Move | None):
         if preferred is None:
@@ -60,35 +63,6 @@ class MinimaxBot:
         if pv_move and pv_move != tt_move and pv_move in moves:
             moves.remove(pv_move)
             moves.insert(1, pv_move)
-
-    """def tt_key(self, board: chess.Board) -> int:
-        
-        Returns a stable 64-bit integer key for the given board.
-        Prefers python-chess's built-in Zobrist key if available,
-        otherwise falls back to a deterministic FEN-based hash.
-        
-        # Try python-chess built-ins first
-        #print("Hi")
-        try:
-            key = board._transposition_key()  # For v1.11.x
-            if isinstance(key, int):
-                print("Yayy")
-                return key
-        except AttributeError:
-            print("Noooo")
-            pass
-
-        try:
-            key = board.zobrist_hash()  # For newer versions (≥1.12)
-            if isinstance(key, int):
-                return key
-        except AttributeError:
-            pass
-
-        # Fallback: 64-bit integer derived from FEN string
-        fen_bytes = board.fen().encode("utf-8")
-        digest = hashlib.blake2b(fen_bytes, digest_size=8).digest()
-        return int.from_bytes(digest, byteorder="big", signed=False)"""
 
     def tt_probe(self, board: chess.Board, depth: int, alpha: float, beta: float):
         key = poly_zobrist_hash(board) & 0xFFFFFFFFFFFFFFFF
@@ -120,6 +94,14 @@ class MinimaxBot:
                 self.tt.pop(next(iter(self.tt)))
             self.tt[key] = TTEntry(depth=depth, value=value, flag=flag, move=best_move)
 
+    def _eval_stm(self, board: chess.Board) -> float:
+        """
+        Evaluation from side-to-move perspective.
+        eval_fn gives + for white, - for black.
+        """
+        raw = self.eval_fn(board)
+        return raw if board.turn == chess.WHITE else -raw
+
     def play(self, board):
         if board.is_game_over():
             return None
@@ -131,7 +113,6 @@ class MinimaxBot:
         # Initial ordering
         legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
 
-        white_turn = (board.turn == chess.WHITE)
         pv_move = None
         best_move_overall = legal_moves[0]  # fallback if nothing improves
 
@@ -139,31 +120,27 @@ class MinimaxBot:
             alpha = -math.inf
             beta = math.inf
             best_move_this_depth = None
-            best_value_this_depth = -math.inf if white_turn else math.inf
+            best_value_this_depth = -math.inf
 
-            # Order for this iteration: PV first if we have one
+            # Order for this iteration: TT move then PV move
             ordered_moves = legal_moves.copy()
-
             tt_val, tt_move = self.tt_probe(board, depth, alpha, beta)
             self.order_with_tt_and_pv(ordered_moves, tt_move, pv_move)
 
             for move in ordered_moves:
                 board.push(move)
-                value = self.minimax(board, depth - 1, alpha, beta, ply=1, allow_null=True)
+                # Negamax at root: value from root side's perspective
+                value = -self.negamax(board, depth - 1, -beta, -alpha, ply=1)
                 board.pop()
 
-                if white_turn:
-                    if value > best_value_this_depth:
-                        best_value_this_depth = value
-                        best_move_this_depth = move
-                    alpha = max(alpha, best_value_this_depth)
-                else:
-                    if value < best_value_this_depth:
-                        best_value_this_depth = value
-                        best_move_this_depth = move
-                    beta = min(beta, best_value_this_depth)
+                if value > best_value_this_depth:
+                    best_value_this_depth = value
+                    best_move_this_depth = move
 
-                if beta <= alpha:
+                if value > alpha:
+                    alpha = value
+
+                if alpha >= beta:
                     break
 
             # Finalize PV and best for this depth
@@ -173,108 +150,59 @@ class MinimaxBot:
 
         return best_move_overall
 
-    def minimax(self, board, depth, alpha, beta, ply, allow_null=True):
-        # Terminal states
+    def negamax(self, board: chess.Board, depth: int, alpha: float, beta: float, ply: int) -> float:
+        # Terminal states (drawish)
         if board.is_stalemate() or board.is_insufficient_material():
             return 0
 
         if board.can_claim_fifty_moves() or board.can_claim_threefold_repetition():
             return 0
 
-            # Full terminal check (rare path)
+        # Full terminal check
         if board.is_game_over(claim_draw=False):
             if board.is_checkmate():
-                return -(MATE_SCORE - ply) if board.turn == chess.WHITE else (MATE_SCORE - ply)
+                # Side to move is checkmated → losing from their perspective
+                return -(MATE_SCORE - ply)
             return 0
 
-            # --- depth / QS handoff ---
+        # --- depth / QS handoff ---
         if depth <= 0:
             if board.is_check():
                 depth = 1  # one-ply check extension
             else:
                 return self.quiescence(board, alpha, beta, ply)
 
-            #print(self.eval_fn(board))
-            #return self.eval_fn(board)  # No sign flipping
         alpha_orig, beta_orig = alpha, beta
+
+        # Transposition table probe
         tt_value, tt_move = self.tt_probe(board, depth, alpha, beta)
         if tt_value is not None:
             return tt_value
-        
-        # Null move pruning
-        # Only try null move if:
-        # 1. Null move pruning is enabled
-        # 2. We're not in check (can't pass when in check)
-        # 3. Depth is sufficient (>= 3)
-        # 4. allow_null is True (prevent consecutive null moves)
-        if (self.use_null_move_pruning and allow_null and 
-            not board.is_check() and depth >= 3):
-            # Make a null move by switching turns
-            board.push(chess.Move.null())
-            # Search at reduced depth (R=2)
-            null_score = self.minimax(board, depth - 3, alpha, beta, ply + 1, allow_null=False)
+
+        best_val = -math.inf
+        best_move = None
+
+        legal_moves = list(board.legal_moves)
+        legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+        self.preferred_first(legal_moves, tt_move)
+
+        for move in legal_moves:
+            board.push(move)
+            val = -self.negamax(board, depth - 1, -beta, -alpha, ply + 1)
             board.pop()
-            
-            # If null move causes beta cutoff, prune this branch
-            if board.turn == chess.WHITE:
-                if null_score >= beta:
-                    return beta
-            else:
-                if null_score <= alpha:
-                    return alpha
-        # White to move → maximize score
-        if board.turn == chess.WHITE:
-            best_val = -math.inf
-            best_move = None
-            legal_moves = list(board.legal_moves)
-            legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
 
-            self.preferred_first(legal_moves, tt_move)
+            if val > best_val:
+                best_val = val
+                best_move = move
 
-            for move in legal_moves:
-                board.push(move)
-                val = self.minimax(board, depth - 1, alpha, beta, ply+1, allow_null=True)
-                board.pop()
+            if val > alpha:
+                alpha = val
 
-                if val > best_val:
-                    best_val = val
-                    best_move = move
-                if best_val > alpha:
-                    alpha = best_val
-                if beta <= alpha:
-                    break
+            if alpha >= beta:
+                break
 
-            self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
-
-            return best_val
-
-        # Black to move → minimize score
-        else:
-            best_val = math.inf
-            best_move = None
-            legal_moves = list(board.legal_moves)
-
-            legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
-            # prefer TT best move first
-            self.preferred_first(legal_moves, tt_move)
-
-            for move in legal_moves:
-                board.push(move)
-                val = self.minimax(board, depth - 1, alpha, beta, ply + 1, allow_null=True)
-                board.pop()
-
-                if val < best_val:
-                    best_val = val
-                    best_move = move
-                if best_val < beta:
-                    beta = best_val
-                if beta <= alpha:
-                    break
-
-            # ---- TT STORE ----
-            self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
-            # ------------------
-            return best_val
+        self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
+        return best_val
 
     """def _store_killer(self, ply: int, move: chess.Move):
         k1, k2 = self.killers.get(ply, (None, None))
@@ -303,23 +231,18 @@ class MinimaxBot:
         promo = 1 if move.promotion else 0
         gives_check = 1 if board.gives_check(move) else 0
 
-        center_bonus = 0
+        """killer_bonus = 0
+        if killer1 and move == killer1:
+            killer_bonus = 1
+        elif killer2 and move == killer2:
+            killer_bonus = 1
 
-    # Always fetch the piece first (safe)
-        piece = board.piece_type_at(move.from_square)
+        hist_bonus = 0
+        if history is not None:
+            hist_bonus = history.get((board.turn, move.from_square, move.to_square), 0)"""
 
-    # Only apply center/dev bonuses on quiet moves
-        if not is_cap:
-            if piece == chess.PAWN:
-                if move.to_square in [chess.E4, chess.D4, chess.E5, chess.D5]:
-                    center_bonus = 8  # small center preference
-
-        elif piece == chess.KNIGHT:
-            if move.to_square in [chess.F3, chess.C3, chess.F6, chess.C6]:
-                center_bonus = 2  # tiny dev bonus
-
-    # Sort high -> low
-        return (is_cap, vv + promo * 50, gives_check, center_bonus)
+        # Sort high -> low
+        return (is_cap, vv + promo * 50, gives_check)
 
     def _see_piece_val(self, board: chess.Board, sq: int) -> int:
         p = board.piece_at(sq)
@@ -386,27 +309,21 @@ class MinimaxBot:
         return total
 
     def quiescence(self, board: chess.Board, alpha: float, beta: float, ply: int) -> float:
-        # Stand-pat (static) eval — assume no more tactics
-        stand_pat = self.eval_fn(board)
+        # Stand-pat (static) eval — from side-to-move perspective
+        stand_pat = self._eval_stm(board)
 
         # Alpha-beta on stand-pat
-        if board.turn == chess.WHITE:
-            if stand_pat >= beta:
-                return beta
-            if stand_pat > alpha:
-                alpha = stand_pat
-        else:
-            if stand_pat <= alpha:
-                return alpha
-            if stand_pat < beta:
-                beta = stand_pat
+        if stand_pat >= beta:
+            return beta
+        if stand_pat > alpha:
+            alpha = stand_pat
 
         # Generate "noisy" moves: captures or promotions
         raw_moves = [m for m in board.legal_moves if board.is_capture(m) or m.promotion]
         if not raw_moves:
             return stand_pat
 
-        # ---- NEW: SEE filter + ordering ----
+        # ---- SEE filter + ordering ----
         buckets = []
         for m in raw_moves:
             mvv_lva = self.victim_value(board, m)  # (victim-attacker)
@@ -419,7 +336,7 @@ class MinimaxBot:
                 continue
             # marginal: compute SEE (expensive)
             see = self.static_exchange_eval(board, m)
-            if see < -50:  # prune small losers
+            if see < -SEE_PRUNE_MARGIN:  # prune small losers
                 continue
             buckets.append((see, mvv_lva, m))
 
@@ -430,36 +347,17 @@ class MinimaxBot:
         buckets.sort(key=lambda t: (t[0], t[1]), reverse=True)
         moves = [m for _, __, m in buckets]
 
-        # Order best tactical payoffs first
-        #scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
-        #moves = [m for _, __, m in scored]
-        # ---- END NEW ----
+        best = stand_pat
+        for move in moves:
+            board.push(move)
+            score = -self.quiescence(board, -beta, -alpha, ply + 1)
+            board.pop()
 
-        if board.turn == chess.WHITE:
-            best = stand_pat
-            for move in moves:
-                board.push(move)
-                score = self.quiescence(board, alpha, beta, ply + 1)
-                board.pop()
+            if score > best:
+                best = score
+            if score > alpha:
+                alpha = score
+            if alpha >= beta:
+                return beta  # fail-hard cutoff
 
-                if score > best:
-                    best = score
-                if score > alpha:
-                    alpha = score
-                if alpha >= beta:
-                    return beta  # fail-hard cutoff
-            return best
-        else:
-            best = stand_pat
-            for move in moves:
-                board.push(move)
-                score = self.quiescence(board, alpha, beta, ply + 1)
-                board.pop()
-
-                if score < best:
-                    best = score
-                if score < beta:
-                    beta = score
-                if beta <= alpha:
-                    return alpha
-            return best
+        return best

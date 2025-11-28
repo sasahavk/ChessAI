@@ -168,4 +168,3 @@ class ChessSimulator:
 simulator = ChessSimulator(10, 50, "positions.csv", 40)
 simulator.generate_positions()
 
-

@@ -160,7 +160,7 @@ def evaluate_pawn_structure(board: chess.Board) -> int:
 
             # Doubled pawns
             if count > 1:
-                score += sign * (count - 1) * (-20)
+                score += sign * (count - 1) * (-10)
 
             # Isolated pawns
             left = FILE_MASKS[file_i - 1] if file_i > 0 else 0

@@ -31,25 +31,25 @@ def evaluate(board:chess.Board) -> int:
 
 	debugPrint("White:" if board.turn == chess.WHITE else "Black:")
 	myTotalValue:int = 0
-	myMoves:list[chess.Move] = list(board.legal_moves)
 	
-	myTotalValue += getPotentialCaptureValue(board, myMoves)
+	myTotalValue += getPotentialCaptureValue(board)
 	myTotalValue += getWholeBoardValue(board)
-	
+	myTotalValue += getPawnClosenessToPromotion(board)
 
 	board.turn = not board.turn
 	debugPrint("\nWhite:" if board.turn == chess.WHITE else "\nBlack:")
 	opponentTotalValue:int = 0
-	opponentMoves:list[chess.Move]  = list(board.legal_moves)
 
-	opponentTotalValue += getPotentialCaptureValue(board, opponentMoves, pieceModValuables)
+	opponentTotalValue += getPotentialCaptureValue(board, pieceModValuables)
 	opponentTotalValue += getWholeBoardValue(board)
+	opponentTotalValue += getPawnClosenessToPromotion(board)
 
 	return myTotalValue - opponentTotalValue
 
-def getPotentialCaptureValue(board:chess.Board, moves:list[chess.Move], pieceModifiers:dict = None) -> int:
+def getPotentialCaptureValue(board:chess.Board, pieceModifiers:dict = None) -> int:
 	total:int = 0
 	
+	moves:list[chess.Move] = list(board.legal_moves)
 	for move in moves:
 		if not board.is_capture(move):
 			continue
@@ -65,7 +65,7 @@ def getPotentialCaptureValue(board:chess.Board, moves:list[chess.Move], pieceMod
 	
 	return total
 
-def getWholeBoardValue(board:chess.Board):
+def getWholeBoardValue(board:chess.Board) -> int:
 	total:int = 0
 	
 	for square in chess.SQUARES:
@@ -73,6 +73,30 @@ def getWholeBoardValue(board:chess.Board):
 		if piece:
 			total += pieceValues[piece.piece_type]
 	
+	return total
+
+def getPawnClosenessToPromotion(board:chess.Board) -> int:
+	squareValues:list[int] = [
+		6, 6, 6, 6, 6, 6, 6, 6,
+		5, 5, 5, 5, 5, 5, 5, 5,
+		4, 4, 4, 4, 4, 4, 4, 4,
+		3, 3, 3, 3, 3, 3, 3, 3,
+		2, 2, 2, 2, 2, 2, 2, 2,
+		1, 1, 1, 1, 1, 1, 1, 1,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0
+	]
+	if board.turn == chess.BLACK:
+		squareValues.reverse()
+
+	total:int = 0
+	pawns:chess.SquareSet = list(board.pieces(chess.PAWN, board.turn))
+	if pawns == []:
+		return total
+
+	for position in pawns:
+		total += squareValues[position]
+	debugPrint(f"pawn total: {total}")
 	return total
 
 def runTestEvals() -> None:
@@ -86,7 +110,8 @@ def runTestEvals() -> None:
 		{"fen": "rnb2rk1/pp1p1ppp/2pn4/3P4/2P1p1QP/4P3/P1qBKPP1/5B1R", "turn": chess.WHITE},
 		{"fen": "rnb2rk1/pp1p1ppp/2pn4/3P3P/2P1p1Q1/4P3/P1qBKPP1/5B1R", "turn": chess.BLACK},
 		{"fen": "rnb2rk1/pp1p1ppp/2p5/3P3P/2n1p1Q1/4P3/P1qBKPP1/5B1R", "turn": chess.WHITE},
-		{"fen": "rnb2rk1/pp1p1ppp/2p4P/3P4/2n1p1Q1/4P3/P2qKPP1/5B1R", "turn": chess.BLACK}
+		{"fen": "rnb2rk1/pp1p1ppp/2p4P/3P4/2n1p1Q1/4P3/P2qKPP1/5B1R", "turn": chess.BLACK},
+		{"fen": "k7/8/8/8/8/8/8/7K", "turn": chess.WHITE}
 	]
 
 	i=1

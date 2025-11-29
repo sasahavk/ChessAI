@@ -1,10 +1,11 @@
 import chess, time, csv
 import chess.engine
 from mcts_bot import MonteCarloSearchTreeBot
-from minimax_group_evaluate import evaluate
+# from minimax_group_evaluate import evaluate
+from evaluate import evaluate
 
-MCTS_ITERS:int = 600
-MAX_DEPTH:int = 40
+MCTS_ITERS:int = 1000
+MAX_DEPTH:int = 150
 MAX_MOVES:int = 200
 
 STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
@@ -19,9 +20,10 @@ def simulateGame(bot1, bot2):
     moves = 0
 
     while not board.is_game_over() and moves < MAX_MOVES:
-        performMove(board, bot1, moves)
-        moves += 1
-        performMove(board, bot2, moves)
+        if moves % 2 == 0:
+            performMove(board, bot1, moves)
+        else:
+            performMove(board, bot2, moves)
         moves += 1
 
     return board.result(), moves

@@ -6,7 +6,16 @@ def debugPrint(msg:str) -> None:
 
 MAX_VALUE:int = 999999999
 
-pieceValues:dict = {
+pieceValue:dict = {
+	chess.KING: 0, # there's always a king
+	chess.QUEEN: 100,
+	chess.KNIGHT: 70,
+	chess.ROOK: 50,
+	chess.BISHOP: 50,
+	chess.PAWN: 10
+}
+
+pieceCaptureValue:dict = {
 	chess.KING: MAX_VALUE,
 	chess.QUEEN: 100,
 	chess.KNIGHT: 70,
@@ -23,6 +32,8 @@ pieceModValuables = {
 	chess.BISHOP: 1,
 	chess.PAWN: 0.5
 }
+
+pawnClosenessMult:int = 5
 
 def evaluate(board:chess.Board) -> int:
 	debugPrint("Board:")
@@ -55,7 +66,7 @@ def getPotentialCaptureValue(board:chess.Board, pieceModifiers:dict = None) -> i
 			continue
 		
 		capturedPiece:chess.Piece = board.piece_at(move.to_square)
-		capturedPieceValue:int = pieceValues[capturedPiece.piece_type]
+		capturedPieceValue:int = pieceCaptureValue[capturedPiece.piece_type]
 		capturedPieceValue = capturedPieceValue * pieceModifiers[capturedPiece.piece_type] \
 			if (pieceModifiers != None) else capturedPieceValue
 		
@@ -70,9 +81,10 @@ def getWholeBoardValue(board:chess.Board) -> int:
 	
 	for square in chess.SQUARES:
 		piece:chess.Piece = board.piece_at(square)
-		if piece:
-			total += pieceValues[piece.piece_type]
+		if piece and piece.color == board.turn:
+			total += pieceValue[piece.piece_type]
 	
+	debugPrint(f"board value for {'white' if board.turn == chess.WHITE else 'black'}: {total}")
 	return total
 
 def getPawnClosenessToPromotion(board:chess.Board) -> int:
@@ -97,7 +109,7 @@ def getPawnClosenessToPromotion(board:chess.Board) -> int:
 	for position in pawns:
 		total += squareValues[position]
 	debugPrint(f"pawn total: {total}")
-	return total
+	return total * pawnClosenessMult
 
 def runTestEvals() -> None:
 	board:chess.Board = chess.Board()

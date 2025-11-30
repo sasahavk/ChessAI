@@ -20,13 +20,13 @@ class TTEntry:
 TT_MAX = 200000
 
 MVV = {
-    chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
+    chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330,
     chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 10000
 }
 
 # For SEE, reuse MVV values; split out for clarity
 SEE_VAL = {
-    chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
+    chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330,
     chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 10000
 }
 
@@ -41,6 +41,9 @@ class MinimaxBot:
         self.eval_fn = eval_fn  # evaluate(board) returns + for white, - for black
         self.tt: dict[int, TTEntry] = {}
         self.use_null_move_pruning = use_null_move_pruning
+
+        self.killers: dict[int, tuple[chess.Move | None, chess.Move | None]] = {}
+        self.history: dict[tuple[bool, int, int], int] = {}
 
     def preferred_first(self, moves: list[chess.Move], preferred: chess.Move | None):
         if preferred is None:
@@ -129,15 +132,24 @@ class MinimaxBot:
             return None
 
         # Initial ordering
-        legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+        legal_moves.sort(key=lambda m: self.order_key(board, m, ply=0), reverse=True)
 
         white_turn = (board.turn == chess.WHITE)
         pv_move = None
         best_move_overall = legal_moves[0]  # fallback if nothing improves
+        prev_score = 0  # last iteration's score (for aspiration window)
+
+        ASP_WINDOW = 75  # centipawns
 
         for depth in range(1, self.depth + 1):
-            alpha = -math.inf
-            beta = math.inf
+            # --- set initial alpha/beta for this depth (aspiration window) ---
+            if depth == 1:
+                alpha = -math.inf
+                beta = math.inf
+            else:
+                alpha = prev_score - ASP_WINDOW
+                beta = prev_score + ASP_WINDOW
+
             best_move_this_depth = None
             best_value_this_depth = -math.inf if white_turn else math.inf
 
@@ -147,6 +159,8 @@ class MinimaxBot:
             tt_val, tt_move = self.tt_probe(board, depth, alpha, beta)
             self.order_with_tt_and_pv(ordered_moves, tt_move, pv_move)
 
+            # ---- 1st search: with aspiration window ----
+            alpha0, beta0 = alpha, beta  # save the window we *intended*
             for move in ordered_moves:
                 board.push(move)
                 value = self.minimax(board, depth - 1, alpha, beta, ply=1, allow_null=True)
@@ -166,10 +180,45 @@ class MinimaxBot:
                 if beta <= alpha:
                     break
 
+            # Check for aspiration fail
+            fail_low = best_value_this_depth <= alpha0
+            fail_high = best_value_this_depth >= beta0
+
+            if (fail_low or fail_high) and depth > 1:
+                # ---- 2nd search: full window re-search ----
+                alpha = -math.inf
+                beta = math.inf
+                best_move_this_depth = None
+                best_value_this_depth = -math.inf if white_turn else math.inf
+
+                ordered_moves = legal_moves.copy()
+                tt_val, tt_move = self.tt_probe(board, depth, alpha, beta)
+                self.order_with_tt_and_pv(ordered_moves, tt_move, pv_move)
+
+                for move in ordered_moves:
+                    board.push(move)
+                    value = self.minimax(board, depth - 1, alpha, beta, ply=1, allow_null=True)
+                    board.pop()
+
+                    if white_turn:
+                        if value > best_value_this_depth:
+                            best_value_this_depth = value
+                            best_move_this_depth = move
+                        alpha = max(alpha, best_value_this_depth)
+                    else:
+                        if value < best_value_this_depth:
+                            best_value_this_depth = value
+                            best_move_this_depth = move
+                        beta = min(beta, best_value_this_depth)
+
+                    if beta <= alpha:
+                        break
+
             # Finalize PV and best for this depth
             if best_move_this_depth is not None:
                 best_move_overall = best_move_this_depth
                 pv_move = best_move_this_depth  # used to order next depth
+                prev_score = best_value_this_depth  # <-- IMPORTANT: store SCORE, not move
 
         return best_move_overall
 
@@ -227,7 +276,7 @@ class MinimaxBot:
             best_val = -math.inf
             best_move = None
             legal_moves = list(board.legal_moves)
-            legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+            legal_moves.sort(key=lambda m: self.order_key(board, m, ply), reverse=True)
 
             self.preferred_first(legal_moves, tt_move)
 
@@ -239,9 +288,18 @@ class MinimaxBot:
                 if val > best_val:
                     best_val = val
                     best_move = move
+
+                    if not board.is_capture(move):
+                        key = (chess.WHITE, move.from_square, move.to_square)
+                        self.history[key] = self.history.get(key, 0) + depth * depth
+                        # simple decay to prevent overflow
+                        if self.history[key] > 1000000:
+                            self.history[key] >>= 1
                 if best_val > alpha:
                     alpha = best_val
                 if beta <= alpha:
+                    if not board.is_capture(move):
+                        self._store_killer(ply, move)
                     break
 
             self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
@@ -254,7 +312,7 @@ class MinimaxBot:
             best_move = None
             legal_moves = list(board.legal_moves)
 
-            legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+            legal_moves.sort(key=lambda m: self.order_key(board, m, ply), reverse=True)
             # prefer TT best move first
             self.preferred_first(legal_moves, tt_move)
 
@@ -266,9 +324,19 @@ class MinimaxBot:
                 if val < best_val:
                     best_val = val
                     best_move = move
+
+                    if not board.is_capture(move):
+                        key = (chess.BLACK, move.from_square, move.to_square)
+                        self.history[key] = self.history.get(key, 0) + depth * depth
+                        # simple decay to prevent overflow
+                        if self.history[key] > 1000000:
+                            self.history[key] >>= 1
+
                 if best_val < beta:
                     beta = best_val
                 if beta <= alpha:
+                    if not board.is_capture(move):
+                        self._store_killer(ply, move)
                     break
 
             # ---- TT STORE ----
@@ -276,10 +344,10 @@ class MinimaxBot:
             # ------------------
             return best_val
 
-    """def _store_killer(self, ply: int, move: chess.Move):
+    def _store_killer(self, ply: int, move: chess.Move):
         k1, k2 = self.killers.get(ply, (None, None))
         if move != k1:
-            self.killers[ply] = (move, k1)"""
+            self.killers[ply] = (move, k1)
 
     def victim_value(self, board: chess.Board, move: chess.Move) -> int:
         if not board.is_capture(move):
@@ -297,7 +365,7 @@ class MinimaxBot:
 
         return victim_val - attacker_val
 
-    def order_key(self, board: chess.Board, move: chess.Move) -> tuple:
+    def order_key(self, board: chess.Board, move: chess.Move, ply: int) -> tuple:
         is_cap = board.is_capture(move)
         vv = self.victim_value(board, move)
         promo = 1 if move.promotion else 0
@@ -314,12 +382,21 @@ class MinimaxBot:
                 if move.to_square in [chess.E4, chess.D4, chess.E5, chess.D5]:
                     center_bonus = 8  # small center preference
 
-        elif piece == chess.KNIGHT:
-            if move.to_square in [chess.F3, chess.C3, chess.F6, chess.C6]:
-                center_bonus = 2  # tiny dev bonus
+            elif piece == chess.KNIGHT:
+                if move.to_square in [chess.F3, chess.C3, chess.F6, chess.C6]:
+                    center_bonus = 2  # tiny dev bonus
+
+        killer1, killer2 = self.killers.get(ply, (None, None))
+        killer_bonus = 0
+        if killer1 and move == killer1:
+            killer_bonus = 2
+        elif killer2 and move == killer2:
+            killer_bonus = 1
+
+        hist_bonus = self.history.get((board.turn, move.from_square, move.to_square), 0)
 
     # Sort high -> low
-        return (is_cap, vv + promo * 50, gives_check, center_bonus)
+        return (is_cap, vv + promo * 50, gives_check, killer_bonus, hist_bonus, center_bonus)
 
     def _see_piece_val(self, board: chess.Board, sq: int) -> int:
         p = board.piece_at(sq)

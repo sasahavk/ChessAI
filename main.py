@@ -13,8 +13,11 @@ WIDTH = HEIGHT = TILE * 8
 
 WHITE_RGB = (255, 255, 255)
 BLACK_RGB = (0, 0, 0)
-LIGHT_SQ = (240, 217, 181)
-DARK_SQ = (181, 136, 99)
+LIGHT_SQ = (185, 160, 130)
+DARK_SQ  = (125, 85, 45)
+
+#LIGHT_SQ = (240, 217, 181)
+#DARK_SQ = (181, 136, 99)
 HILITE_RGBA = (255, 255, 0, 90)
 
 FONT_NAME = "segoeuisymbol"
@@ -22,10 +25,19 @@ FONT_SIZE = 36
 
 # Stockfish: set path when you’re ready
 STOCKFISH_PATH = r"C:\Users\dhruv\PycharmProjects\stockfish\stockfish-windows-x86-64-avx2.exe"
-STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
+STOCKFISH_LIMIT = chess.engine.Limit(time=2)  # or depth=12, nodes=...
 
 # How long to display result screen (ms)
 RESULT_DISPLAY_MS = 2500
+
+PIECE_GLYPHS = {
+    chess.PAWN:   ("P", "p"),  # white, black
+    chess.KNIGHT: ("N", "n"),
+    chess.BISHOP: ("B", "b"),
+    chess.ROOK:   ("R", "r"),
+    chess.QUEEN:  ("Q", "q"),
+    chess.KING:   ("K", "k"),
+}
 
 
 def get_square_from_xy(x: int, y: int) -> chess.Square:
@@ -58,6 +70,8 @@ class ChessGame:
         self.highlighted_sqrs = []
 
         self.highlight_layer = None
+        self.last_move: chess.Move | None = None
+        self.last_move_squares: list[chess.Square] = []
 
         self.engine = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
@@ -73,7 +87,7 @@ class ChessGame:
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1800})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 2000})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
 
@@ -93,11 +107,13 @@ class ChessGame:
             piece = self.board.piece_at(sq)
             if not piece:
                 continue
+
             color = WHITE_RGB if piece.color == chess.WHITE else BLACK_RGB
             r = chess.square_rank(sq)
             f = chess.square_file(sq)
             glyph = piece.unicode_symbol()
             text_surface = self.font.render(glyph, True, color)
+
             cx = TILE // 2 + TILE * f
             cy = TILE // 2 + TILE * (7 - r)
             rect = text_surface.get_rect(center=(cx, cy))
@@ -105,6 +121,16 @@ class ChessGame:
 
     def draw_highlights(self):
         self.highlight_layer.fill((0, 0, 0, 0))
+        if self.last_move_squares:
+            for sq in self.last_move_squares:
+                r = chess.square_rank(sq)
+                f = chess.square_file(sq)
+                pygame.draw.rect(
+                    self.highlight_layer,
+                    (255, 220, 120, 110),  # orange-ish, semi-transparent
+                    pygame.Rect(f * TILE, (7 - r) * TILE, TILE, TILE),
+                )
+
         for sq in self.highlighted_sqrs:
             r = chess.square_rank(sq)
             f = chess.square_file(sq)
@@ -280,8 +306,12 @@ class ChessGame:
 
         made_move = False
         if move_to_push is not None:
+            san_str = self.board.san(move_to_push)
             self.board.push(move_to_push)
+            print("Human played:", san_str)
             made_move = True
+            self.last_move = move_to_push
+            self.last_move_squares = [move_to_push.from_square, move_to_push.to_square]
 
         # reset selection
         self.has_selected = False
@@ -293,7 +323,11 @@ class ChessGame:
     def play_minimax_turn(self):
         mv = self.minimax.play(self.board)
         if mv:
+            san_str = self.board.san(mv)
             self.board.push(mv)
+            print("Minimax played:", san_str)
+            self.last_move = mv
+            self.last_move_squares = [mv.from_square, mv.to_square]
 
     def play_stockfish_turn(self):
         if not self.engine:
@@ -302,7 +336,11 @@ class ChessGame:
         try:
             result = self.engine.play(self.board, STOCKFISH_LIMIT)
             if result and result.move:
+                san_str = self.board.san(result.move)
                 self.board.push(result.move)
+                print("Stockfish played:", san_str)
+                self.last_move = result.move
+                self.last_move_squares = [result.move.from_square, result.move.to_square]
         except Exception as e:
             print(f"[WARN] Stockfish error: {e}")
             # graceful fallback
@@ -322,6 +360,7 @@ class ChessGame:
             pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
             self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
             self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+
             self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             clock = pygame.time.Clock()
         else:
@@ -343,8 +382,9 @@ class ChessGame:
                             moved_this_frame |= self.handle_human_click(event)
 
                 self.draw_board()
-                self.draw_pieces_from_board()
                 self.draw_highlights()
+                self.draw_pieces_from_board()
+                #self.draw_highlights()
                 pygame.display.flip()
 
                 if moved_this_frame:
@@ -366,8 +406,9 @@ class ChessGame:
 
             if render:
                 self.draw_board()
-                self.draw_pieces_from_board()
                 self.draw_highlights()
+                self.draw_pieces_from_board()
+                #self.draw_highlights()
                 pygame.display.flip()
                 clock.tick(60)
 
@@ -426,10 +467,10 @@ def run_batch(num_games=10):
         print(f"\n=== Starting game {i} ===")
 
         game = ChessGame(
-            white_player="stockfish",
-            black_player="minimax",
-            minimax_depth=4,
-            flip_board=False,  # or True; see part 2
+            white_player="minimax",
+            black_player="stockfish",
+            minimax_depth=6,
+            flip_board=False,
         )
 
         start_time = time.time()
@@ -457,7 +498,7 @@ def main():
     # Example: Minimax (white) vs Human (black)
     #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
     #game.play()
-    run_batch(num_games=100)
+    run_batch(num_games=1)
 
 if __name__ == "__main__":
     main()

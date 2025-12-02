@@ -23,27 +23,32 @@ class TTEntry:
 TT_MAX = 200000
 
 MVV = {
-    chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
+    chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330,
     chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 10000
 }
 
 # For SEE, reuse MVV values; split out for clarity
 SEE_VAL = {
-    chess.PAWN: 100, chess.KNIGHT: 300, chess.BISHOP: 300,
+    chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330,
     chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 10000
 }
 
-# Skip captures in QS if SEE says you lose ≥ this many centipawns
-SEE_PRUNE_MARGIN = 50  # 0.5 pawn; tune 0..100
-
+SEE_PRUNE_MARGIN = 50  # same as minimax
 MATE_SCORE = 1000000
 
 
 class NegamaxBot:
-    def __init__(self, depth=6, eval_fn=None):
+    def __init__(self, depth=6, eval_fn=None, use_null_move_pruning=True):
         self.depth = depth
         self.eval_fn = eval_fn  # evaluate(board) returns + for white, - for black
         self.tt: dict[int, TTEntry] = {}
+        self.use_null_move_pruning = use_null_move_pruning
+
+        # Match MinimaxBot features
+        self.killers: dict[int, tuple[chess.Move | None, chess.Move | None]] = {}
+        self.history: dict[tuple[bool, int, int], int] = {}
+
+    # ---------- Helpers: TT + ordering ----------
 
     def preferred_first(self, moves: list[chess.Move], preferred: chess.Move | None):
         if preferred is None:
@@ -102,7 +107,9 @@ class NegamaxBot:
         raw = self.eval_fn(board)
         return raw if board.turn == chess.WHITE else -raw
 
-    def play(self, board):
+    # ---------- Public entry ----------
+
+    def play(self, board: chess.Board):
         if board.is_game_over():
             return None
 
@@ -110,27 +117,36 @@ class NegamaxBot:
         if not legal_moves:
             return None
 
-        # Initial ordering
-        legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+        # Initial ordering (ply=0)
+        legal_moves.sort(key=lambda m: self.order_key(board, m, ply=0), reverse=True)
 
         pv_move = None
         best_move_overall = legal_moves[0]  # fallback if nothing improves
+        prev_score = 0  # last iteration's score for aspiration window
+
+        ASP_WINDOW = 75  # centipawns
 
         for depth in range(1, self.depth + 1):
-            alpha = -math.inf
-            beta = math.inf
+            # Aspiration window
+            if depth == 1:
+                alpha = -math.inf
+                beta = math.inf
+            else:
+                alpha = prev_score - ASP_WINDOW
+                beta = prev_score + ASP_WINDOW
+
             best_move_this_depth = None
             best_value_this_depth = -math.inf
 
-            # Order for this iteration: TT move then PV move
             ordered_moves = legal_moves.copy()
             tt_val, tt_move = self.tt_probe(board, depth, alpha, beta)
             self.order_with_tt_and_pv(ordered_moves, tt_move, pv_move)
 
+            # ---- 1st search with aspiration window ----
+            alpha0, beta0 = alpha, beta
             for move in ordered_moves:
                 board.push(move)
-                # Negamax at root: value from root side's perspective
-                value = -self.negamax(board, depth - 1, -beta, -alpha, ply=1)
+                value = -self.negamax(board, depth - 1, -beta, -alpha, ply=1, allow_null=True)
                 board.pop()
 
                 if value > best_value_this_depth:
@@ -143,15 +159,49 @@ class NegamaxBot:
                 if alpha >= beta:
                     break
 
+            # Aspiration fail?
+            fail_low = best_value_this_depth <= alpha0
+            fail_high = best_value_this_depth >= beta0
+
+            if (fail_low or fail_high) and depth > 1:
+                # ---- Re-search with full window ----
+                alpha = -math.inf
+                beta = math.inf
+                best_move_this_depth = None
+                best_value_this_depth = -math.inf
+
+                ordered_moves = legal_moves.copy()
+                tt_val, tt_move = self.tt_probe(board, depth, alpha, beta)
+                self.order_with_tt_and_pv(ordered_moves, tt_move, pv_move)
+
+                for move in ordered_moves:
+                    board.push(move)
+                    value = -self.negamax(board, depth - 1, -beta, -alpha, ply=1, allow_null=True)
+                    board.pop()
+
+                    if value > best_value_this_depth:
+                        best_value_this_depth = value
+                        best_move_this_depth = move
+
+                    if value > alpha:
+                        alpha = value
+
+                    if alpha >= beta:
+                        break
+
             # Finalize PV and best for this depth
             if best_move_this_depth is not None:
                 best_move_overall = best_move_this_depth
-                pv_move = best_move_this_depth  # used to order next depth
+                pv_move = best_move_this_depth
+                prev_score = best_value_this_depth
 
         return best_move_overall
 
-    def negamax(self, board: chess.Board, depth: int, alpha: float, beta: float, ply: int) -> float:
-        # Terminal states (drawish)
+    # ---------- Core negamax search ----------
+
+    def negamax(self, board: chess.Board, depth: int,
+                alpha: float, beta: float, ply: int, allow_null: bool = True) -> float:
+        # Draw-ish terminal states
         if board.is_stalemate() or board.is_insufficient_material():
             return 0
 
@@ -174,40 +224,62 @@ class NegamaxBot:
 
         alpha_orig, beta_orig = alpha, beta
 
-        # Transposition table probe
+        # ---- Transposition table probe ----
         tt_value, tt_move = self.tt_probe(board, depth, alpha, beta)
         if tt_value is not None:
             return tt_value
+
+        # ---- Null move pruning (like in minimax) ----
+        if (self.use_null_move_pruning and allow_null and
+                not board.is_check() and depth >= 3):
+            board.push(chess.Move.null())
+            # Reduced-depth null move search
+            null_score = -self.negamax(board, depth - 3, -beta, -beta + 1, ply + 1, allow_null=False)
+            board.pop()
+            if null_score >= beta:
+                return beta
 
         best_val = -math.inf
         best_move = None
 
         legal_moves = list(board.legal_moves)
-        legal_moves.sort(key=lambda m: self.order_key(board, m), reverse=True)
+        legal_moves.sort(key=lambda m: self.order_key(board, m, ply), reverse=True)
         self.preferred_first(legal_moves, tt_move)
 
         for move in legal_moves:
             board.push(move)
-            val = -self.negamax(board, depth - 1, -beta, -alpha, ply + 1)
+            val = -self.negamax(board, depth - 1, -beta, -alpha, ply + 1, allow_null=True)
             board.pop()
 
             if val > best_val:
                 best_val = val
                 best_move = move
 
+                # History update for quiet moves
+                if not board.is_capture(move):
+                    key = (board.turn, move.from_square, move.to_square)
+                    self.history[key] = self.history.get(key, 0) + depth * depth
+                    if self.history[key] > 1000000:
+                        self.history[key] >>= 1
+
             if val > alpha:
                 alpha = val
 
             if alpha >= beta:
+                # Killer move on beta cutoff, quiet only
+                if not board.is_capture(move):
+                    self._store_killer(ply, move)
                 break
 
         self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
         return best_val
 
-    """def _store_killer(self, ply: int, move: chess.Move):
+    # ---------- Move ordering helpers (MVV-LVA, killers, history, center) ----------
+
+    def _store_killer(self, ply: int, move: chess.Move):
         k1, k2 = self.killers.get(ply, (None, None))
         if move != k1:
-            self.killers[ply] = (move, k1)"""
+            self.killers[ply] = (move, k1)
 
     def victim_value(self, board: chess.Board, move: chess.Move) -> int:
         if not board.is_capture(move):
@@ -225,24 +297,39 @@ class NegamaxBot:
 
         return victim_val - attacker_val
 
-    def order_key(self, board: chess.Board, move: chess.Move) -> tuple:
+    def order_key(self, board: chess.Board, move: chess.Move, ply: int) -> tuple:
         is_cap = board.is_capture(move)
         vv = self.victim_value(board, move)
         promo = 1 if move.promotion else 0
         gives_check = 1 if board.gives_check(move) else 0
 
-        """killer_bonus = 0
+        center_bonus = 0
+
+        # piece at from-square
+        piece = board.piece_type_at(move.from_square)
+
+        # Only apply center/dev bonuses on quiet moves
+        if not is_cap:
+            if piece == chess.PAWN:
+                if move.to_square in [chess.E4, chess.D4, chess.E5, chess.D5]:
+                    center_bonus = 8  # small center preference
+            elif piece == chess.KNIGHT:
+                if move.to_square in [chess.F3, chess.C3, chess.F6, chess.C6]:
+                    center_bonus = 2  # tiny dev bonus
+
+        killer1, killer2 = self.killers.get(ply, (None, None))
+        killer_bonus = 0
         if killer1 and move == killer1:
-            killer_bonus = 1
+            killer_bonus = 2
         elif killer2 and move == killer2:
             killer_bonus = 1
 
-        hist_bonus = 0
-        if history is not None:
-            hist_bonus = history.get((board.turn, move.from_square, move.to_square), 0)"""
+        hist_bonus = self.history.get((board.turn, move.from_square, move.to_square), 0)
 
         # Sort high -> low
-        return (is_cap, vv + promo * 50, gives_check)
+        return (is_cap, vv + promo * 50, gives_check, killer_bonus, hist_bonus, center_bonus)
+
+    # ---------- SEE + quiescence (mirroring minimax behavior) ----------
 
     def _see_piece_val(self, board: chess.Board, sq: int) -> int:
         p = board.piece_at(sq)
@@ -263,7 +350,6 @@ class NegamaxBot:
         """
         target = move.to_square
 
-        # First “gain” is the victim on target (handle EP specially)
         tmp = board.copy(stack=False)
 
         if tmp.is_en_passant(move):
@@ -274,17 +360,13 @@ class NegamaxBot:
         promo_gain = self._see_promo_delta(move)
         total = victim_value + promo_gain  # original side's initial gain
 
-        # Make the capture
         tmp.push(move)
 
-        # After pushing, it's the opponent's turn
         sign = -1  # subtract opponent gains from our perspective
 
         while True:
-            # List all *legal* recaptures that land back on `target`
             candidates = []
             for m in tmp.legal_moves:
-                # must land on target and be a capture
                 if m.to_square == target and tmp.is_capture(m):
                     attacker = tmp.piece_at(m.from_square)
                     if attacker is None:
@@ -296,13 +378,10 @@ class NegamaxBot:
             if not candidates:
                 break
 
-            # Least Valuable Attacker (LVA) recaptures first
             attacker_val, promo_delta, recap = min(candidates, key=lambda x: x[0])
 
-            # Opponent “gains” our piece on target → from our POV, subtract (sign = -1 here)
             total += sign * (attacker_val + promo_delta)
 
-            # Play the recapture and alternate side
             tmp.push(recap)
             sign *= -1
 
@@ -312,38 +391,31 @@ class NegamaxBot:
         # Stand-pat (static) eval — from side-to-move perspective
         stand_pat = self._eval_stm(board)
 
-        # Alpha-beta on stand-pat
         if stand_pat >= beta:
             return beta
         if stand_pat > alpha:
             alpha = stand_pat
 
-        # Generate "noisy" moves: captures or promotions
         raw_moves = [m for m in board.legal_moves if board.is_capture(m) or m.promotion]
         if not raw_moves:
             return stand_pat
 
-        # ---- SEE filter + ordering ----
         buckets = []
         for m in raw_moves:
-            mvv_lva = self.victim_value(board, m)  # (victim-attacker)
-            # obvious losers: skip immediately
-            if mvv_lva < -150:  # tune: -100..-200
+            mvv_lva = self.victim_value(board, m)
+            if mvv_lva < -150:
                 continue
-            # obvious winners: trust MVV–LVA, no SEE needed
             if mvv_lva > 150:
-                buckets.append((9999, mvv_lva, m))  # huge SEE key so they sort first
+                buckets.append((9999, mvv_lva, m))
                 continue
-            # marginal: compute SEE (expensive)
             see = self.static_exchange_eval(board, m)
-            if see < -SEE_PRUNE_MARGIN:  # prune small losers
+            if see < -SEE_PRUNE_MARGIN:
                 continue
             buckets.append((see, mvv_lva, m))
 
         if not buckets:
             return stand_pat
 
-        # order by (SEE or 9999), then MVV–LVA
         buckets.sort(key=lambda t: (t[0], t[1]), reverse=True)
         moves = [m for _, __, m in buckets]
 
@@ -358,6 +430,6 @@ class NegamaxBot:
             if score > alpha:
                 alpha = score
             if alpha >= beta:
-                return beta  # fail-hard cutoff
+                return beta
 
         return best

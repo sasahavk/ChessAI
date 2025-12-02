@@ -7,6 +7,7 @@ from pathlib import Path
 import time
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
+from minimax_group.minimax_new import FastMinimaxBot
 
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
@@ -60,6 +61,7 @@ class ChessGame:
 
         self.board = chess.Board()
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
+        self.minimax_new = FastMinimaxBot(depth=minimax_depth, eval_fn=evaluate)
         self.flip_board = flip_board
         self.screen = None
         self.font = None
@@ -72,6 +74,11 @@ class ChessGame:
         self.highlight_layer = None
         self.last_move: chess.Move | None = None
         self.last_move_squares: list[chess.Square] = []
+
+        self.minimax_time_total = 0.0
+        self.minimax_moves = 0
+        self.minimax_new_time_total = 0.0
+        self.minimax_new_moves = 0
 
         self.engine = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
@@ -87,7 +94,7 @@ class ChessGame:
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 2000})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1900})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
 
@@ -321,13 +328,36 @@ class ChessGame:
 
     # ---------- AI turns ----------
     def play_minimax_turn(self):
+        start = time.perf_counter()
         mv = self.minimax.play(self.board)
+        elapsed = time.perf_counter() - start
+
         if mv:
             san_str = self.board.san(mv)
             self.board.push(mv)
-            print("Minimax played:", san_str)
+            print(f"Minimax played: {san_str}  (t = {elapsed:.3f}s)")
             self.last_move = mv
             self.last_move_squares = [mv.from_square, mv.to_square]
+
+            # update stats
+            self.minimax_time_total += elapsed
+            self.minimax_moves += 1
+
+    def play_minimax_new_turn(self):
+        start = time.perf_counter()
+        mv = self.minimax_new.play(self.board)
+        elapsed = time.perf_counter() - start
+
+        if mv:
+            san_str = self.board.san(mv)
+            self.board.push(mv)
+            print(f"NewMinimax played: {san_str}  (t = {elapsed:.3f}s)")
+            self.last_move = mv
+            self.last_move_squares = [mv.from_square, mv.to_square]
+
+            # update stats
+            self.minimax_new_time_total += elapsed
+            self.minimax_new_moves += 1
 
     def play_stockfish_turn(self):
         if not self.engine:
@@ -396,11 +426,15 @@ class ChessGame:
                 if self.board.turn == chess.WHITE and self.white_player != "human":
                     if self.white_player == "minimax":
                         self.play_minimax_turn()
+                    elif self.white_player == "new_minimax":
+                        self.play_minimax_new_turn()
                     elif self.white_player == "stockfish":
                         self.play_stockfish_turn()
                 elif self.board.turn == chess.BLACK and self.black_player != "human":
                     if self.black_player == "minimax":
                         self.play_minimax_turn()
+                    elif self.black_player == "new_minimax":
+                        self.play_minimax_new_turn()
                     elif self.black_player == "stockfish":
                         self.play_stockfish_turn()
 
@@ -424,6 +458,16 @@ class ChessGame:
 
         # Print to terminal every game
         print(f"[RESULT] Winner: {winner}  (white={self.white_player}, black={self.black_player})")
+
+        if self.minimax_moves > 0:
+            avg_old = self.minimax_time_total / self.minimax_moves
+            print(f"[STATS] Old Minimax: {self.minimax_moves} moves, "
+                  f"avg {avg_old:.3f} s/move")
+
+        if self.minimax_new_moves > 0:
+            avg_new = self.minimax_new_time_total / self.minimax_new_moves
+            print(f"[STATS] New Minimax: {self.minimax_new_moves} moves, "
+                  f"avg {avg_new:.3f} s/move")
 
         # Show banner only when rendering
         if self.running and render:
@@ -469,7 +513,7 @@ def run_batch(num_games=10):
         game = ChessGame(
             white_player="minimax",
             black_player="stockfish",
-            minimax_depth=6,
+            minimax_depth=5,
             flip_board=False,
         )
 
@@ -498,7 +542,7 @@ def main():
     # Example: Minimax (white) vs Human (black)
     #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
     #game.play()
-    run_batch(num_games=1)
+    run_batch(num_games=10)
 
 if __name__ == "__main__":
     main()

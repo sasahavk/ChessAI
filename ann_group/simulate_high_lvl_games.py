@@ -22,6 +22,8 @@ def win_result_scaled_tempo(pos, opp_power):
         win_score += win_score * ((40-pos) / 30)*0.1
     elif pos <= 70:
         win_score -= win_score * ((pos-40) / 30)*0.1
+    else:
+        win_score -= win_score*0.1
 
     return win_score
 
@@ -127,6 +129,8 @@ class ChessSimulator:
 
         while not self.board.is_game_over():
             if self.is_draw():
+                if self.board.ply() >= 300:
+                    print("LONG")
                 has_draw = True
                 break
             move_no = (self.board.ply() // 2)+1
@@ -148,7 +152,7 @@ class ChessSimulator:
             self.engines[i][0].quit()
 
     def is_draw(self):
-        return (self.board.ply() >= 16 and self.board.is_repetition(3)) or self.board.is_fifty_moves() or self.board.is_stalemate() or self.board.ply() >= 140
+        return (self.board.ply() >= 16 and self.board.is_repetition(3)) or self.board.is_fifty_moves() or self.board.is_stalemate()
 
     def generate_positions(self):
         for i in range(self.batch_count):

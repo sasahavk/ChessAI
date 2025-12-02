@@ -165,7 +165,7 @@ class ChessSimulator:
         self.quit_engines()
 
 
-simulator = ChessSimulator(10, 50, "positions.csv", 40)
+simulator = ChessSimulator(10, 50, "positions_OLD.csv", 40)
 simulator.generate_positions()
 
 

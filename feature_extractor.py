@@ -379,7 +379,7 @@ def mirror_square(sq: int) -> int:
     return ((7 - (sq // 8)) * 8) + (sq % 8)
 
 
-def write_features_file(input_file='positions.csv',output_file='positions_with_features.csv',):
+def write_features_file(input_file='positions_OLD.csv',output_file='positions_with_features.csv',):
     fe = FeatureExtractorN(chess.Board(), 0)
     feature_names = list(feature_weights.keys())
     feature_names.sort()

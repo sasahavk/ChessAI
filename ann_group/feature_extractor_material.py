@@ -46,17 +46,34 @@ class MaterialFeatureExtractor:
                 scores.append(side * v * (len(board.pieces(piece_type, chess.WHITE)) - len(board.pieces(piece_type, chess.BLACK))))
         return scores
 
+
+    def material_balance(self, color):
+        board = self.board
+        scores = []
+
+        for piece_type, v in PIECE_VALUE.items():
+            if piece_type != chess.KING:
+                scores.append(v * (len(board.pieces(piece_type, color)) ))
+        return scores
+
+
     def ft_mobility_one_side(self, safety = False):
         # total number of legal squares each piece type can move to for the current player
         board = self.board
         scores = [0] * 6
         attacked_squares = set()
-        if safety:
-            for piece_type in chess.PIECE_TYPES:
-                for square in board.pieces(piece_type, not board.turn):
-                    attacked_squares.update(board.attacks(square))
+
+        for piece_type in chess.PIECE_TYPES:
+            for square in board.pieces(piece_type, not board.turn):
+                attacked_squares.update(board.attacks(square))
+
         for move in list(board.legal_moves):
-            if safety and move.to_square in attacked_squares: continue
+            if safety:
+                if move.to_square in attacked_squares:
+                    continue
+            else:
+                if move.to_square not in attacked_squares:
+                    continue
             piece = board.piece_at(move.from_square)
             if piece: scores[piece.piece_type - 1] += 1
         return scores

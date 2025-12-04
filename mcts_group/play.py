@@ -1,8 +1,8 @@
 import chess, time, csv
 import chess.engine
 from mcts_bot import MonteCarloSearchTreeBot
-# from minimax_group_evaluate import evaluate
-from evaluate import evaluate
+from minimax_group_evaluate import evaluate
+# from evaluate import evaluate
 
 MCTS_ITERS:int = 1000
 MAX_DEPTH:int = 150
@@ -17,6 +17,7 @@ stockfish.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
 
 def simulateGame(bot1, bot2):
     board = chess.Board()
+    # board.set_board_fen("k7/2K5/8/1Q6/8/8/8/8")  # one move away from a win on white's side
     moves = 0
 
     while not board.is_game_over() and moves < MAX_MOVES:

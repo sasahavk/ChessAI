@@ -37,21 +37,23 @@ class Node:
 	
 
 class MonteCarloSearchTreeBot:
-	def __init__(self, numRootSimulations:int, maxSimDepth:int, evalFunc=None, rememberPastBoardScores:bool=True):
+	def __init__(self, numRootSimulations:int, maxSimDepth:int, evalFunc=None, rememberPastBoardScores:bool=True, conditionForSimulatingTriedMoves=None):
 		self.numRootSimulations	:int = numRootSimulations	
 		self.maxSimDepth:int = maxSimDepth
 		self.evalFunc = backupEvalFunc if (evalFunc == None) else evalFunc
 		self.color:bool = None
 		self.rememberPastBoardScores:bool = rememberPastBoardScores
 		self.boardScores:dict = {}
+		self.conditionForSimulatingTriedMoves = defaultRuleForLookingAtTriedMoves \
+			if (conditionForSimulatingTriedMoves == None) else conditionForSimulatingTriedMoves
 
 	def play(self, board:chess.Board) -> chess.Move:		
 		self.color = board.turn
 		root:Node = Node(board)
 
-		for _ in range(self.numRootSimulations):
+		for i in range(self.numRootSimulations):
 			# Selection + Expansion
-			leaf:Node = self.applyTreePolicy(root)
+			leaf:Node = self.applyTreePolicy(root, self.conditionForSimulatingTriedMoves(i))
 
 			# Simulation
 			result:int = self.rollout(leaf) if not (board.fen() in self.boardScores) else self.boardScores[board.fen()]
@@ -59,16 +61,20 @@ class MonteCarloSearchTreeBot:
 			# Backpropagation
 			self.backpropagate(leaf, result)
 
+			# if result >= VAL_WIN:
+			# 	# print("YOU HAVE A WINNING SET OF MOVES!  TAKE IT!")
+			# 	break
+
 		if not root.children:
 			return random.choice(list(board.legal_moves))
 		
 		return max(root.children, key=lambda n: n.score / n.visits).lastMove
 	
-	def applyTreePolicy(self, node:Node) -> Node:
+	def applyTreePolicy(self, node:Node, skipUntriedMoves:bool = False) -> Node:
 		currentNode:Node = node
 
 		while not (currentNode.board.is_game_over()):
-			if currentNode.untried_moves: # "play" a random move
+			if (currentNode.untried_moves and not skipUntriedMoves) or not currentNode.children: # "play" a random move
 				randomMove:chess.Move = random.choice(currentNode.untried_moves)
 				return currentNode.add_child(randomMove)
 			currentNode:Node = currentNode.best_child()
@@ -124,3 +130,11 @@ def backupEvalFunc(board:chess.Board) -> int:
 			- len(board.pieces(piece, chess.BLACK))
 		)
     return score if board.turn else -score
+
+def defaultRuleForLookingAtTriedMoves(totalRootSimulations:int) -> bool:
+	# out of 10 root simulations
+	# look at untried moves for 4 out of 10 moves
+	# and tried moves for 10-4=6 out of 10 moves  
+	numSimulationsNeededToSwitch:int = 4
+	modulateTotalBy:int = 10
+	return True if (totalRootSimulations % modulateTotalBy > numSimulationsNeededToSwitch) else False

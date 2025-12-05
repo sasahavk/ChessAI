@@ -25,6 +25,7 @@ HILITE_RGBA = (255, 255, 0, 90)
 
 # Stockfish: set path when you’re ready
 STOCKFISH_LIMIT = chess.engine.Limit(time=2)  # or depth=12, nodes=...
+STOCKFISH_ELO = 1900
 
 # How long to display result screen (ms)
 RESULT_DISPLAY_MS = 2500
@@ -92,7 +93,7 @@ class ChessGame:
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1900})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
 

@@ -8,6 +8,7 @@ import time
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
 from minimax_group.minimax_new import FastMinimaxBot
+import env_variables as env
 
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
@@ -21,11 +22,8 @@ DARK_SQ  = (125, 85, 45)
 #DARK_SQ = (181, 136, 99)
 HILITE_RGBA = (255, 255, 0, 90)
 
-FONT_NAME = "segoeuisymbol"
-FONT_SIZE = 36
 
 # Stockfish: set path when you’re ready
-STOCKFISH_PATH = r"C:\Users\dhruv\PycharmProjects\stockfish\stockfish-windows-x86-64-avx2.exe"
 STOCKFISH_LIMIT = chess.engine.Limit(time=2)  # or depth=12, nodes=...
 
 # How long to display result screen (ms)
@@ -53,7 +51,7 @@ class ChessGame:
     Side strings:
       - "human": clicks
       - "minimax": our Python Minimax
-      - "stockfish": external engine (if STOCKFISH_PATH is set)
+      - "stockfish": external engine (if env.STOCKFISH_PATH is set)
     """
     def __init__(self, white_player="human", black_player="minimax", minimax_depth=4, flip_board=False):
         self.white_player = white_player
@@ -82,14 +80,14 @@ class ChessGame:
 
         self.engine = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
-            if STOCKFISH_PATH:
+            if env.STOCKFISH_PATH:
                 try:
-                    self.engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+                    self.engine = chess.engine.SimpleEngine.popen_uci(env.STOCKFISH_PATH)
                 except Exception as e:
                     print(f"[WARN] Could not start Stockfish: {e}")
                     self.engine = None
             else:
-                print("[INFO] STOCKFISH_PATH not set; Stockfish disabled for this run.")
+                print("[INFO] env.STOCKFISH_PATH not set; Stockfish disabled for this run.")
 
         if self.engine:
             try:
@@ -389,7 +387,7 @@ class ChessGame:
             pygame.init()
             pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
             self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-            self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+            self.font = pygame.font.SysFont(env.FONT_NAME, env.FONT_SIZE)
 
             self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             clock = pygame.time.Clock()
@@ -540,9 +538,9 @@ def run_batch(num_games=10):
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
-    #game.play()
-    run_batch(num_games=10)
+    game = ChessGame(white_player="human", black_player="stockfish", minimax_depth=4)
+    game.play()
+    # run_batch(num_games=10)
 
 if __name__ == "__main__":
     main()

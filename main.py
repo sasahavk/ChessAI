@@ -141,6 +141,12 @@ class ChessGame:
         if self.white_player == "stockfish" or self.black_player == "stockfish":
             self.engine_analyze = load_stockfish()
 
+    def kill_stockfish(self):
+        if self.engine:
+            self.engine.quit()
+        if self.engine_analyze:
+            self.engine_analyze.quit()
+
     def draw_board(self):
         for r in range(8):
             for f in range(8):
@@ -751,6 +757,9 @@ class ChessGame:
         # ----- Game over -----
         # Decide winner/label once
         # ----- Game over -----
+        print("ashduiawhduiwanuidnwaid")
+        self.kill_stockfish()
+
         outcome = self.board.outcome()
         if outcome and outcome.winner is not None:
             winner = "white" if outcome.winner else "black"

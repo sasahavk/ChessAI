@@ -45,6 +45,17 @@ class MinimaxBot:
         self.killers: dict[int, tuple[chess.Move | None, chess.Move | None]] = {}
         self.history: dict[tuple[bool, int, int], int] = {}
 
+    def reset_stats(self):
+        self.nodes = 0  # total minimax nodes (non-QS)
+        self.qs_nodes = 0  # quiescence nodes
+        self.alpha_beta_cutoffs = 0
+        self.null_move_attempts = 0
+        self.null_move_cutoffs = 0
+        self.see_prunes = 0
+        self.tt_hits = 0
+        self.tt_stores = 0
+        self.search_depth_reached = 0
+
     def preferred_first(self, moves: list[chess.Move], preferred: chess.Move | None):
         if preferred is None:
             return
@@ -98,6 +109,7 @@ class MinimaxBot:
         ent = self.tt.get(key)
         if ent is None:
             return None, None
+        self.tt_hits += 1
         if ent.depth >= depth:
             if ent.flag == TTFlag.EXACT:
                 return ent.value, ent.move
@@ -122,11 +134,12 @@ class MinimaxBot:
             if len(self.tt) >= TT_MAX:
                 self.tt.pop(next(iter(self.tt)))
             self.tt[key] = TTEntry(depth=depth, value=value, flag=flag, move=best_move)
+            self.tt_stores += 1
 
     def play(self, board):
         if board.is_game_over():
             return None
-
+        self.reset_stats()
         legal_moves = list(board.legal_moves)
         if not legal_moves:
             return None
@@ -142,6 +155,7 @@ class MinimaxBot:
         ASP_WINDOW = 75  # centipawns
 
         for depth in range(1, self.depth + 1):
+            self.search_depth_reached = depth
             # --- set initial alpha/beta for this depth (aspiration window) ---
             if depth == 1:
                 alpha = -math.inf
@@ -224,6 +238,8 @@ class MinimaxBot:
 
     def minimax(self, board, depth, alpha, beta, ply, allow_null=True):
         # Terminal states
+        self.nodes += 1
+
         if board.is_stalemate() or board.is_insufficient_material():
             return 0
 
@@ -258,6 +274,7 @@ class MinimaxBot:
         # 4. allow_null is True (prevent consecutive null moves)
         if (self.use_null_move_pruning and allow_null and 
             not board.is_check() and depth >= 3):
+            self.null_move_attempts += 1
             # Make a null move by switching turns
             board.push(chess.Move.null())
             # Search at reduced depth (R=2)
@@ -267,9 +284,11 @@ class MinimaxBot:
             # If null move causes beta cutoff, prune this branch
             if board.turn == chess.WHITE:
                 if null_score >= beta:
+                    self.null_move_cutoffs += 1
                     return beta
             else:
                 if null_score <= alpha:
+                    self.null_move_cutoffs += 1
                     return alpha
         # White to move → maximize score
         if board.turn == chess.WHITE:
@@ -300,6 +319,7 @@ class MinimaxBot:
                 if beta <= alpha:
                     if not board.is_capture(move):
                         self._store_killer(ply, move)
+                    self.alpha_beta_cutoffs += 1
                     break
 
             self.tt_store(board, depth, best_val, alpha_orig, beta_orig, best_move)
@@ -337,6 +357,7 @@ class MinimaxBot:
                 if beta <= alpha:
                     if not board.is_capture(move):
                         self._store_killer(ply, move)
+                    self.alpha_beta_cutoffs += 1
                     break
 
             # ---- TT STORE ----
@@ -463,6 +484,8 @@ class MinimaxBot:
         return total
 
     def quiescence(self, board: chess.Board, alpha: float, beta: float, ply: int) -> float:
+        self.qs_nodes += 1
+
         # Stand-pat (static) eval — assume no more tactics
         stand_pat = self.eval_fn(board)
 
@@ -489,6 +512,7 @@ class MinimaxBot:
             mvv_lva = self.victim_value(board, m)  # (victim-attacker)
             # obvious losers: skip immediately
             if mvv_lva < -150:  # tune: -100..-200
+                self.see_prunes += 1
                 continue
             # obvious winners: trust MVV–LVA, no SEE needed
             if mvv_lva > 150:
@@ -497,6 +521,7 @@ class MinimaxBot:
             # marginal: compute SEE (expensive)
             see = self.static_exchange_eval(board, m)
             if see < -50:  # prune small losers
+                self.see_prunes += 1
                 continue
             buckets.append((see, mvv_lva, m))
 

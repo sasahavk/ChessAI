@@ -4,10 +4,14 @@ import chess
 import chess.engine
 import csv
 from pathlib import Path
+import os
+import shutil
 import time
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
 from minimax_group.minimax_new import FastMinimaxBot
+import env_variables as env
+from chess.engine import SimpleEngine, Info
 
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
@@ -21,12 +25,10 @@ DARK_SQ  = (125, 85, 45)
 #DARK_SQ = (181, 136, 99)
 HILITE_RGBA = (255, 255, 0, 90)
 
-FONT_NAME = "segoeuisymbol"
-FONT_SIZE = 36
 
 # Stockfish: set path when you’re ready
-STOCKFISH_PATH = r"C:\Users\dhruv\PycharmProjects\stockfish\stockfish-windows-x86-64-avx2.exe"
-STOCKFISH_LIMIT = chess.engine.Limit(time=2)  # or depth=12, nodes=...
+STOCKFISH_LIMIT = chess.engine.Limit(time=2.0)  # or depth=12, nodes=...
+STOCKFISH_ELO = 1900
 
 # How long to display result screen (ms)
 RESULT_DISPLAY_MS = 2500
@@ -41,6 +43,33 @@ PIECE_GLYPHS = {
 }
 
 
+def load_stockfish():
+    # 1. Try system-installed Stockfish
+    system_path = shutil.which("stockfish")
+    if system_path:
+        print("[INFO] Using system Stockfish:", system_path)
+        try:
+            return SimpleEngine.popen_uci(system_path)
+        except Exception as e:
+            print("[WARN] Failed to load system Stockfish:", e)
+
+    # 2. Fall back to bundled binary inside repo
+    root = os.path.dirname(os.path.abspath(__file__))
+    local_path = os.path.join(root, "stockfish", "stockfish","stockfish-windows-x86-64-avx2.exe")
+
+    if os.path.exists(local_path):
+        print("[INFO] Using bundled Stockfish:", local_path)
+        try:
+            return SimpleEngine.popen_uci(local_path)
+        except Exception as e:
+            print("[ERROR] Failed to launch bundled Stockfish:", e)
+
+    # 3. If everything failed
+    print("[ERROR] No Stockfish available. Minimax-only mode.")
+    return None
+
+
+
 def get_square_from_xy(x: int, y: int) -> chess.Square:
     """Convert screen (x,y) to chess.Square (0..63), with rank 7 at top row."""
     file_ = x // TILE
@@ -53,7 +82,7 @@ class ChessGame:
     Side strings:
       - "human": clicks
       - "minimax": our Python Minimax
-      - "stockfish": external engine (if STOCKFISH_PATH is set)
+      - "stockfish": external engine (if env.STOCKFISH_PATH is set)
     """
     def __init__(self, white_player="human", black_player="minimax", minimax_depth=4, flip_board=False):
         self.white_player = white_player
@@ -80,23 +109,25 @@ class ChessGame:
         self.minimax_new_time_total = 0.0
         self.minimax_new_moves = 0
 
+        self.move_log: list[dict] = []
+
+        self.stockfish_time_total = 0.0
+        self.stockfish_moves = 0
+
         self.engine = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
-            if STOCKFISH_PATH:
-                try:
-                    self.engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-                except Exception as e:
-                    print(f"[WARN] Could not start Stockfish: {e}")
-                    self.engine = None
-            else:
-                print("[INFO] STOCKFISH_PATH not set; Stockfish disabled for this run.")
+            self.engine = load_stockfish()
 
         if self.engine:
             try:
                 # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": 1900})
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
+
+        self.engine_analyze = None
+        if self.white_player == "stockfish" or self.black_player == "stockfish":
+            self.engine_analyze = load_stockfish()
 
     def draw_board(self):
         for r in range(8):
@@ -326,8 +357,202 @@ class ChessGame:
         self.highlighted_sqrs = []
         return made_move
 
+    def _sf_analyse(self, board: chess.Board, pov_color: chess.Color | None = None) -> dict | None:
+        if not self.engine_analyze:
+            return None
+
+        # Ask python-chess for all available info (new API uses Info flags, not strings)
+        info = self.engine_analyze.analyse(
+            board,
+            STOCKFISH_LIMIT,
+            info=Info.ALL,
+        )
+
+        eval_cp = None
+        score = info.get("score")
+        if score is not None:
+            if pov_color is None:
+                pov_color = board.turn
+            pov = score.pov(pov_color)
+            if pov.is_mate():
+                mate_in = pov.mate()
+                if mate_in is not None:
+                    sign = 1 if mate_in > 0 else -1
+                    eval_cp = sign * 100000
+            else:
+                eval_cp = pov.score()
+
+        pv = info.get("pv")
+        best_move = pv[0] if pv else None
+
+        return {
+            "eval_cp": eval_cp,
+            "depth": info.get("depth"),
+            "nodes": info.get("nodes"),
+            "nps": info.get("nps"),
+            "time": info.get("time"),
+            "best_move": best_move,
+        }
+
+    def _extract_eval_cp(self, info: dict, pov_color: chess.Color) -> int | None:
+        score = info.get("score")
+        if score is None:
+            return None
+
+        pov = score.pov(pov_color)
+
+        if pov.is_mate():
+            mate_in = pov.mate()
+            if mate_in is not None:
+                sign = 1 if mate_in > 0 else -1
+                return sign * 100000
+            return None
+        else:
+            return pov.score()
+
+    def log_minimax_move(self, move: chess.Move, move_san: str, color: chess.Color,
+                         elapsed: float,
+                         pre_info: dict | None,
+                         post_info: dict | None):
+        """Log one Minimax move + Stockfish analysis into move_log."""
+        ply = len(self.board.move_stack)
+
+        sf_eval_cp = post_info["eval_cp"] if post_info else None
+        sf_depth = pre_info["depth"] if pre_info else None
+        sf_nodes = pre_info["nodes"] if pre_info else None
+        sf_nps = pre_info["nps"] if pre_info else None
+        sf_time = pre_info["time"] if pre_info else None
+
+        # centipawn loss: from Minimax side's POV
+        cp_loss = None
+        error_type = None
+        sf_agreement = None
+
+        if pre_info and post_info:
+            pre_eval = pre_info["eval_cp"]
+            post_eval = post_info["eval_cp"]
+            if pre_eval is not None and post_eval is not None:
+                cp_loss = pre_eval - post_eval  # >0 means position got worse for Minimax
+                delta = max(0, cp_loss)
+                if delta <= 50:
+                    error_type = "ok"
+                elif delta <= 150:
+                    error_type = "inaccuracy"
+                elif delta <= 300:
+                    error_type = "mistake"
+                else:
+                    error_type = "blunder"
+
+            best_move = pre_info.get("best_move")
+            if best_move is not None:
+                sf_agreement = 1 if best_move == move else 0
+            else:
+                sf_agreement = None
+
+        # Minimax search stats (from MinimaxBot)
+        mb = self.minimax
+        nodes = getattr(mb, "nodes", None)
+        qs_nodes = getattr(mb, "qs_nodes", None)
+        depth_reached = getattr(mb, "search_depth_reached", None)
+        alpha_beta_cutoffs = getattr(mb, "alpha_beta_cutoffs", None)
+        null_move_attempts = getattr(mb, "null_move_attempts", None)
+        null_move_cutoffs = getattr(mb, "null_move_cutoffs", None)
+        see_prunes = getattr(mb, "see_prunes", None)
+        tt_hits = getattr(mb, "tt_hits", None)
+        tt_stores = getattr(mb, "tt_stores", None)
+
+        nps_minimax = None
+        if elapsed > 0 and nodes is not None:
+            nps_minimax = nodes / elapsed
+
+        self.move_log.append({
+            "ply": ply,
+            "side": "white" if color == chess.WHITE else "black",
+            "engine": "minimax",
+            "move_uci": move.uci(),
+            "move_san": move_san,
+
+            # Move Quality vs Stockfish
+            "sf_eval_cp": sf_eval_cp,
+            "sf_depth": sf_depth,
+            "sf_nodes": sf_nodes,
+            "sf_nps": sf_nps,
+            "sf_time": sf_time,
+
+            "cp_loss": cp_loss,
+            "error_type": error_type,
+            "sf_agreement": sf_agreement,
+
+            # Search stats (Minimax only)
+            "nodes_searched": nodes,
+            "qs_nodes": qs_nodes,
+            "search_depth": depth_reached,
+            "time_spent": elapsed,
+            "nps_minimax": nps_minimax,
+
+            # Pruning stats
+            "alpha_beta_cutoffs": alpha_beta_cutoffs,
+            "null_move_attempts": null_move_attempts,
+            "null_move_cutoffs": null_move_cutoffs,
+            "see_prunes": see_prunes,
+            "tt_hits": tt_hits,
+            "tt_stores": tt_stores,
+        })
+
+    def log_stockfish_move(self, move: chess.Move, move_san: str, color: chess.Color,
+                           elapsed: float,
+                           info: dict | None):
+        """Log one Stockfish move into move_log (minimal fields)."""
+        ply = len(self.board.move_stack)
+
+        sf_eval_cp = info["eval_cp"] if info else None
+        sf_depth = info["depth"] if info else None
+        sf_nodes = info["nodes"] if info else None
+        sf_nps = info["nps"] if info else None
+        sf_time = info["time"] if info else None
+
+        self.move_log.append({
+            "ply": ply,
+            "side": "white" if color == chess.WHITE else "black",
+            "engine": "stockfish",
+            "move_uci": move.uci(),
+            "move_san": move_san,
+
+            # Stockfish metrics
+            "sf_eval_cp": sf_eval_cp,
+            "sf_depth": sf_depth,
+            "sf_nodes": sf_nodes,
+            "sf_nps": sf_nps,
+            "sf_time": sf_time,
+
+            # No quality or search stats for Stockfish (Minimax-only fields)
+            "cp_loss": None,
+            "error_type": None,
+            "sf_agreement": None,
+
+            "nodes_searched": None,
+            "qs_nodes": None,
+            "search_depth": None,
+            "time_spent": elapsed,   # we *do* log total time per SF move
+            "nps_minimax": None,
+
+            "alpha_beta_cutoffs": None,
+            "null_move_attempts": None,
+            "null_move_cutoffs": None,
+            "see_prunes": None,
+            "tt_hits": None,
+            "tt_stores": None,
+        })
+
+
     # ---------- AI turns ----------
     def play_minimax_turn(self):
+        color_to_move = self.board.turn  # who is about to move (for logging)
+
+        # 1) Stockfish eval BEFORE Minimax move (pre_info)
+        pre_info = self._sf_analyse(self.board, pov_color=color_to_move) if self.engine_analyze else None
+
+        # 2) Let Minimax search
         start = time.perf_counter()
         mv = self.minimax.play(self.board)
         elapsed = time.perf_counter() - start
@@ -339,9 +564,22 @@ class ChessGame:
             self.last_move = mv
             self.last_move_squares = [mv.from_square, mv.to_square]
 
-            # update stats
+            # 3) Stockfish eval AFTER Minimax move (post_info)
+            post_info = self._sf_analyse(self.board, pov_color=color_to_move) if self.engine_analyze else None
+
+            # 4) Update per-game stats
             self.minimax_time_total += elapsed
             self.minimax_moves += 1
+
+            # 5) Log full Minimax + Stockfish-analysis data
+            self.log_minimax_move(
+                move=mv,
+                move_san=san_str,
+                color=color_to_move,
+                elapsed=elapsed,
+                pre_info=pre_info,
+                post_info=post_info,
+            )
 
     def play_minimax_new_turn(self):
         start = time.perf_counter()
@@ -363,22 +601,55 @@ class ChessGame:
         if not self.engine:
             self.play_minimax_turn()
             return
-        try:
-            result = self.engine.play(self.board, STOCKFISH_LIMIT)
-            if result and result.move:
-                san_str = self.board.san(result.move)
-                self.board.push(result.move)
-                print("Stockfish played:", san_str)
-                self.last_move = result.move
-                self.last_move_squares = [result.move.from_square, result.move.to_square]
-        except Exception as e:
-            print(f"[WARN] Stockfish error: {e}")
-            # graceful fallback
-            #self.play_minimax_turn()
+
+        color_to_move = self.board.turn
+
+        # Single search: get move + stats in one call
+        start = time.perf_counter()
+        result = self.engine.play(
+            self.board,
+            STOCKFISH_LIMIT,
+            info=Info.ALL,
+        )
+        elapsed = time.perf_counter() - start
+
+        mv = result.move
+        sf_info = result.info
+
+        if mv is None:
+            print("[WARN] Stockfish play() did not return a move")
+            return
+
+        san_str = self.board.san(mv)
+        self.board.push(mv)
+        print(f"Stockfish played: {san_str}  (t = {elapsed:.3f}s)")
+        self.last_move = mv
+        self.last_move_squares = [mv.from_square, mv.to_square]
+
+        # Update timing stats
+        self.stockfish_time_total += elapsed
+        self.stockfish_moves += 1
+
+        # Log using the same info dict
+        self.log_stockfish_move(
+            move=mv,
+            move_san=san_str,
+            color=color_to_move,
+            elapsed=elapsed,
+            info={
+                "eval_cp": self._extract_eval_cp(sf_info, pov_color=color_to_move),
+                "depth": sf_info.get("depth"),
+                "nodes": sf_info.get("nodes"),
+                "nps": sf_info.get("nps"),
+                "time": sf_info.get("time"),
+                "best_move": mv,  # PV[0] is effectively this move
+            },
+        )
 
     # ---------- main loop ----------
     # In ChessGame
     def play(self, render: bool | None = None, block_on_gameover: bool | None = None):
+        game_start_time = time.perf_counter()
         # Auto settings: show UI if a human is involved; block at end iff we are rendering
         if render is None:
             render = (self.white_player == "human" or self.black_player == "human")
@@ -389,7 +660,7 @@ class ChessGame:
             pygame.init()
             pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
             self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-            self.font = pygame.font.SysFont(FONT_NAME, FONT_SIZE)
+            self.font = pygame.font.SysFont(env.FONT_NAME, env.FONT_SIZE)
 
             self.highlight_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             clock = pygame.time.Clock()
@@ -448,6 +719,7 @@ class ChessGame:
 
         # ----- Game over -----
         # Decide winner/label once
+        # ----- Game over -----
         outcome = self.board.outcome()
         if outcome and outcome.winner is not None:
             winner = "white" if outcome.winner else "black"
@@ -456,54 +728,108 @@ class ChessGame:
         else:
             winner = "draw"
 
-        # Print to terminal every game
+        # Termination type
+        if outcome and outcome.termination:
+            termination = outcome.termination.name.lower()  # e.g. "checkmate", "stalemate", ...
+        elif self.board.is_checkmate():
+            termination = "checkmate"
+        elif self.board.is_stalemate():
+            termination = "stalemate"
+        else:
+            termination = "unknown"
+
+        game_length_plies = len(self.board.move_stack)
+        total_game_time = time.perf_counter() - game_start_time
+
+        avg_time_minimax = (self.minimax_time_total / self.minimax_moves) if self.minimax_moves > 0 else 0.0
+        avg_time_stockfish = (self.stockfish_time_total / self.stockfish_moves) if self.stockfish_moves > 0 else 0.0
+
         print(f"[RESULT] Winner: {winner}  (white={self.white_player}, black={self.black_player})")
-
         if self.minimax_moves > 0:
-            avg_old = self.minimax_time_total / self.minimax_moves
-            print(f"[STATS] Old Minimax: {self.minimax_moves} moves, "
-                  f"avg {avg_old:.3f} s/move")
+            print(f"[STATS] Minimax: {self.minimax_moves} moves, avg {avg_time_minimax:.3f} s/move")
+        if self.stockfish_moves > 0:
+            print(f"[STATS] Stockfish: {self.stockfish_moves} moves, avg {avg_time_stockfish:.3f} s/move")
 
-        if self.minimax_new_moves > 0:
-            avg_new = self.minimax_new_time_total / self.minimax_new_moves
-            print(f"[STATS] New Minimax: {self.minimax_new_moves} moves, "
-                  f"avg {avg_new:.3f} s/move")
-
-        # Show banner only when rendering
-        if self.running and render:
-            self.draw_board()
-            self.draw_pieces_from_board()
-            self.draw_highlights()
-            self.show_center_banner(self.get_result_text())
-            pygame.display.flip()
-
-        # Append to CSV (same as you had)
+        # --- Per-game CSV (A) ---
         results_path = Path("results_log.csv")
         write_header = not results_path.exists()
+
+        # Compute game_id from existing rows
+        if write_header:
+            existing_games = 0
+        else:
+            with results_path.open("r", encoding="utf-8") as rf:
+                existing_games = sum(1 for _ in rf) - 1  # minus header
+        game_id = existing_games + 1
+
         with results_path.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            fieldnames = [
+                "game_id",
+                "winner",
+                "termination",
+                "white_player",
+                "black_player",
+                "game_length_plies",
+                "avg_time_per_move_minimax",
+                "avg_time_per_move_stockfish",
+                "total_game_time",
+            ]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             if write_header:
-                writer.writerow(["game_id", "winner", "white_player", "black_player"])
-            existing_lines = sum(1 for _ in open(results_path, "r", encoding="utf-8")) - (1 if write_header else 0)
-            writer.writerow([existing_lines + 1, winner, self.white_player, self.black_player])
+                writer.writeheader()
 
-        # Keep window open at end only when interactive
-        if block_on_gameover and render:
-            waiting = True
-            while waiting:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        waiting = False
-                pygame.time.Clock().tick(30)
+            writer.writerow({
+                "game_id": game_id,
+                "winner": winner,
+                "termination": termination,
+                "white_player": self.white_player,
+                "black_player": self.black_player,
+                "game_length_plies": game_length_plies,
+                "avg_time_per_move_minimax": avg_time_minimax,
+                "avg_time_per_move_stockfish": avg_time_stockfish,
+                "total_game_time": total_game_time,
+            })
 
-        # Cleanup
-        if self.engine:
-            try:
-                self.engine.quit()
-            except Exception:
-                pass
-        if render:
-            pygame.quit()
+        # --- Per-move CSV (B + Stockfish moves) ---
+        move_stats_path = Path("move_stats.csv")
+        write_header_moves = not move_stats_path.exists()
+
+        with move_stats_path.open("a", newline="", encoding="utf-8") as f:
+            fieldnames = [
+                "game_id",
+                "ply",
+                "side",
+                "engine",
+                "move_san",
+                "move_uci",
+                "sf_eval_cp",
+                "sf_depth",
+                "sf_nodes",
+                "sf_nps",
+                "sf_time",
+                "cp_loss",
+                "error_type",
+                "sf_agreement",
+                "nodes_searched",
+                "qs_nodes",
+                "search_depth",
+                "time_spent",
+                "nps_minimax",
+                "alpha_beta_cutoffs",
+                "null_move_attempts",
+                "null_move_cutoffs",
+                "see_prunes",
+                "tt_hits",
+                "tt_stores",
+            ]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            if write_header_moves:
+                writer.writeheader()
+
+            for row in self.move_log:
+                out = row.copy()
+                out["game_id"] = game_id
+                writer.writerow(out)
 
 
 def run_batch(num_games=10):
@@ -540,9 +866,9 @@ def run_batch(num_games=10):
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    #game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=4)
-    #game.play()
+    game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=5)
     run_batch(num_games=10)
 
 if __name__ == "__main__":
     main()
+

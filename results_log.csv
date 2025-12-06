@@ -1,0 +1,4 @@
+game_id,winner,termination,white_player,black_player,game_length_plies,avg_time_per_move_minimax,avg_time_per_move_stockfish,total_game_time
+1,draw,unknown,human,stockfish,0,0.0,0.0,7.668317099996784
+2,draw,unknown,human,stockfish,8,1.4275219500004823,0.0,39.26217149999866
+3,white,checkmate,minimax,human,23,4.978962775000279,0.0,121.22904989999734

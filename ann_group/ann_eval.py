@@ -5,10 +5,11 @@ import numpy as np
 from keras.saving import load_model
 import time
 import warnings
-warnings.filterwarnings("ignore",  message="X does not have valid feature names")
 import feature_extractor
 from feature_extractor import FeatureExtractorN
 from minimax_group import minimax_bot
+
+warnings.filterwarnings("ignore",  message="X does not have valid feature names")
 
 model_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/ann_model2.keras'
 scaler_x_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/scaler_features2.joblib'
@@ -28,10 +29,10 @@ class ann:
         self.df_input = pd.DataFrame()
 
     def eval(self, board: chess.Board) -> float:
+
         self.fe.set_board(board)
         self.features_dict = self.fe.get_features_subset_dict(self.features)
-        X = np.array([self.features_dict.get(f, 0) for f in self.features],
-                     dtype=np.float32).reshape(1, -1)
+        X = np.array([self.features_dict.get(f, 0) for f in self.features], dtype=np.float32).reshape(1, -1)
 
         X_scaled = self.scaler_x.transform(X)
         y_pred_scaled = self.model(X_scaled, training=False)
@@ -85,15 +86,6 @@ def benchmark_ann(ann_obj, num_positions=10_0):
     print(f"Model:                             {type(ann_obj).__name__}")
     print(f"Features:                          {len(ann_obj.features)}")
     print("=" * 60)
-
-    if avg_time_ms < 1.0:
-        print("LIGHTNING FAST — suitable for full engine search!")
-    elif avg_time_ms < 5.0:
-        print("Very fast — perfect for real-time play")
-    elif avg_time_ms < 20.0:
-        print("Good — usable with shallow search")
-    else:
-        print("Slow — needs optimization")
 
     return avg_time_ms
 

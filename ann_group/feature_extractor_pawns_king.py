@@ -60,8 +60,16 @@ class PawnFeatureExtractor:
                 black_passed_pawns += 1
 
         if self.board.turn == chess.WHITE:
-            return white_passed_pawns - black_passed_pawns
-        return black_passed_pawns - white_passed_pawns
+            return (white_passed_pawns - black_passed_pawns)*PASSED_PAWN_WEIGHT
+        return (black_passed_pawns - white_passed_pawns)*PASSED_PAWN_WEIGHT
+
+    def passed_pawns_color(self, color: chess.Color):
+        pawns = self.board.pieces(chess.PAWN, color)
+        passed_pawns = 0
+        for p in chess.SquareSet(pawns):
+            if self.is_passed_pawn(p, color):
+                passed_pawns += 1
+        return passed_pawns*PASSED_PAWN_WEIGHT
 
     def is_passed_pawn(self, sqr: chess.Square, color: chess.Color):
         enemy_pawns = self.board.pieces(chess.PAWN, not color)
@@ -90,8 +98,17 @@ class PawnFeatureExtractor:
             return total
         w, b = count(chess.WHITE), count(chess.BLACK)
         if self.board.turn == chess.WHITE:
-            return (w - b)
-        return (b - w)
+            return (w - b)*DOUBLED_PAWN_WEIGHT
+        return (b - w)*DOUBLED_PAWN_WEIGHT
+
+    def doubled_pawns_color(self, color: chess.Color):
+        pawns = self.board.pieces(chess.PAWN, color)
+        total = 0
+        for f in range(8):
+            n = len(pawns & chess.BB_FILES[f])
+            if n > 1:
+                total += (n - 1)
+        return total*DOUBLED_PAWN_WEIGHT
 
     def isolated_pawns(self) -> int:
         def count(color: chess.Color) -> int:
@@ -108,8 +125,19 @@ class PawnFeatureExtractor:
         w = count(chess.WHITE)
         b = count(chess.BLACK)
         if self.board.turn == chess.WHITE:
-            return (w - b)
-        return (b - w)
+            return (w - b)*ISOLATED_PAWN_WEIGHT
+        return (b - w)*ISOLATED_PAWN_WEIGHT
+
+    def isolated_pawns_color(self, color: chess.Color):
+        pawns = self.board.pieces(chess.PAWN, color)
+        total = 0
+        for p in chess.SquareSet(pawns):
+            f = chess.square_file(p)
+            left_mask = chess.BB_FILES[f - 1] if f > 0 else 0
+            right_mask = chess.BB_FILES[f + 1] if f < 7 else 0
+            if (pawns & (left_mask | right_mask)) == 0:
+                total += 1
+        return total*ISOLATED_PAWN_WEIGHT
 
     def connected_pawns(self) -> int:
         def count(color: chess.Color) -> int:
@@ -142,8 +170,37 @@ class PawnFeatureExtractor:
         w = count(chess.WHITE)
         b = count(chess.BLACK)
         if self.board.turn == chess.WHITE:
-            return (w - b)
-        return (b - w)
+            return (w - b)*CONNECTED_PAWN_WEIGHT
+        return (b - w)*CONNECTED_PAWN_WEIGHT
+
+    def connected_pawns_color(self, color: chess.Color):
+        pawns = self.board.pieces(chess.PAWN, color)
+        total = 0
+
+        # phalanx: adjacent files, same rank
+        for f in range(7):
+            pf = pawns & chess.BB_FILES[f]
+            pfp1 = pawns & chess.BB_FILES[f + 1]
+            if pf and pfp1:
+                for sq in chess.SquareSet(pf):
+                    r = chess.square_rank(sq)
+                    if pfp1 & chess.BB_RANKS[r]:
+                        total += 1
+
+        # pawn chain: defended from behind-diagonal
+        dir_ = -1 if color == chess.WHITE else 1
+        for p in chess.SquareSet(pawns):
+            f = chess.square_file(p)
+            r = chess.square_rank(p)
+            sr = r + dir_
+            if 0 <= sr <= 7:
+                left_connected = (f > 0) and (
+                            (pawns >> chess.square(f - 1, sr)) & 1)
+                right_connected = (f < 7) and (
+                            (pawns >> chess.square(f + 1, sr)) & 1)
+                if left_connected or right_connected:
+                    total += 1
+        return total*CONNECTED_PAWN_WEIGHT
 
     def compute(self) -> dict:
         passed = self.passed_pawns() * PASSED_PAWN_WEIGHT
@@ -193,8 +250,28 @@ class KingFeatureExtractor:
         w = shield(chess.WHITE)
         b = shield(chess.BLACK)
         if self.board.turn == chess.WHITE:
-            return w - b
-        return b - w
+            return (w - b)*KING_SHIELD_WEIGHT
+        return (b - w)*KING_SHIELD_WEIGHT
+
+    def pawn_shield_color(self, color:chess.Color):
+        ksq = self.board.king(color)
+        if ksq is None:
+            return 0
+        pawns = self.board.pieces(chess.PAWN, color)
+        kf = chess.square_file(ksq)
+        kr = chess.square_rank(ksq)
+        dir_ = 1 if color == chess.WHITE else -1
+        s = 0
+        for df in (-1, 0, 1):
+            f = kf + df
+            if 0 <= f <= 7:
+                r1 = kr + dir_
+                r2 = kr + 2 * dir_
+                if 0 <= r1 <= 7 and ((pawns >> chess.square(f, r1)) & 1):
+                    s += 2
+                if 0 <= r2 <= 7 and ((pawns >> chess.square(f, r2)) & 1):
+                    s += 1
+        return s*KING_SHIELD_WEIGHT
 
     def half_open_king_files(self) -> int:
         def half_open(color: chess.Color) -> int:
@@ -213,8 +290,21 @@ class KingFeatureExtractor:
         w = half_open(chess.WHITE)
         b = half_open(chess.BLACK)
         if self.board.turn == chess.WHITE:
-            return w - b
-        return b - w
+            return (w - b)*HALF_OPEN_KING_FILES_PEN
+        return (b - w)*HALF_OPEN_KING_FILES_PEN
+
+    def half_open_king_files_color(self, color:chess.Color):
+        ksq = self.board.king(color)
+        if ksq is None:
+            return 0
+        pawns = self.board.pieces(chess.PAWN, color)
+        kf = chess.square_file(ksq)
+        total = 0
+        for df in (-1, 0, 1):
+            f = kf + df
+            if 0 <= f <= 7 and (pawns & chess.BB_FILES[f]) == 0:
+                total += 1
+        return total*HALF_OPEN_KING_FILES_PEN
 
     def king_ring_enemy_pressure(self) -> int:
         def pressure(color: chess.Color) -> int:
@@ -234,8 +324,22 @@ class KingFeatureExtractor:
         w = pressure(chess.WHITE)
         b = pressure(chess.BLACK)
         if self.board.turn == chess.WHITE:
-            return w - b
-        return b - w
+            return (w - b)*KING_RING_PRESSURE_WEIGHT
+        return (b - w)*KING_RING_PRESSURE_WEIGHT
+
+    def king_ring_enemy_pressure_color(self, color:chess.Color):
+        ksq = self.board.king(color)
+        if ksq is None:
+            return 0
+        enemy = not color
+        ring = chess.BB_KING_ATTACKS[ksq] | chess.BB_SQUARES[ksq]
+        total = 0
+        for sq in chess.SquareSet(ring):
+            for a in self.board.attackers(enemy, sq):
+                piece = self.board.piece_at(a)
+                if piece:
+                    total += ATTACKER_WEIGHT.get(piece.piece_type, 0)
+        return total*KING_RING_PRESSURE_WEIGHT
 
     def compute(self) -> dict:
         shield = self.pawn_shield() * KING_SHIELD_WEIGHT

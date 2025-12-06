@@ -88,52 +88,161 @@ END_GAME = 2
 
 feature_weights = {
     "attack_balance": 0,
-    # "bishop_outposts": BISHOP_OUTPOST_WEIGHT,
-    "bishop_pair_white": BISHOP_PAIR_WEIGHT,
-    "bishop_pair_black": BISHOP_PAIR_WEIGHT,
-    # "bishop_sqr_sum": 0,
-    "bknrk_sqr_sum": 0,
+    "attack_black": 0,
+    "attack_white": 0,
+
+    "bishop_outposts_black": 0,
+    "bishop_outposts_white": 0,
+
+    "bishop_pair_white": 0,
+    "bishop_pair_black": 0,
+
+    "bishop_sqr_sum": 0,
+    "bishop_sqr_sum_black": 0,
+    "bishop_sqr_sum_white": 0,
+
+    # "bknrk_sqr_sum": 0,
+
     "center_attackers_white": CENTER_ATTACK_WEIGHTS,
     "center_attackers_black": CENTER_ATTACK_WEIGHTS,
-    "connected_pawns": kpfe.CONNECTED_PAWN_WEIGHT,
+
+    "connected_pawns": 0,
+    "connected_pawns_black": 0,
+    "connected_pawns_white": 0,
+
     "defense_balance": 0,
-    "doubled_pawns": kpfe.DOUBLED_PAWN_WEIGHT,
-    "half_open_king_files": kpfe.HALF_OPEN_KING_FILES_PEN,
-    # "isolated_pawns": kpfe.ISOLATED_PAWN_WEIGHT,
-    "king_ring_enemy_pressure": kpfe.KING_RING_PRESSURE_WEIGHT,
-    # "king_sqr_sum": 0,
-    # "knight_outposts": KNIGHT_OUTPOST_WEIGHT,
-    # "knight_sqr_sum":0,
+    "defense_black": 0,
+    "defense_white": 0,
+
+    "doubled_pawns": 0,
+    "doubled_pawns_black": 0,
+    "doubled_pawns_white": 0,
+
+    "half_open_king_files": 0,
+    "half_open_king_files_black": 0,
+    "half_open_king_files_white": 0,
+
+    "isolated_pawns": 0,
+    "isolated_pawns_black": 0,
+    "isolated_pawns_white": 0,
+
+    "king_ring_enemy_pressure": 0,
+    "king_ring_enemy_pressure_black": 0,
+    "king_ring_enemy_pressure_white": 0,
+
+    "king_sqr_sum": 0,
+    "king_sqr_sum_black": 0,
+    "king_sqr_sum_white": 0,
+
+    "knight_outposts_black": 0,
+    "knight_outposts_white": 0,
+
+    "knight_sqr_sum":0,
+    "knight_sqr_sum_black": 0,
+    "knight_sqr_sum_white": 0,
+
     "material_bishop_white": 0,
     "material_bishop_black": 0,
+
     "material_knight_white": 0,
     "material_knight_black": 0,
+
     "material_pawn_white": 0,
     "material_pawn_black": 0,
+
     "material_queen_white": 0,
     "material_queen_black": 0,
+
     "material_rook_white": 0,
     "material_rook_black": 0,
+
     "mobility_balance": 0,
+    "mobility_black": 0,
+    "mobility_white": 0,
+
     "mobility_safe_balance": 0,
+    "mobility_safe_black": 0,
+    "mobility_safe_white": 0,
+
     "outposts_white":0,
     "outposts_black": 0,
-    "passed_pawns": kpfe.PASSED_PAWN_WEIGHT,
-    "pawn_shield": kpfe.KING_SHIELD_WEIGHT,
-    "pawn_sqr_sum": 0,
-    "pieces_occupying_center": CENTER_OCCUPY_BONUS,
-    "queen_sqr_sum": 0,
-    # "rook_sqr_sum": 0,
-    "target": 0,
-    "threat_balance": 0,
-}
 
+    "passed_pawns": 0,
+    "passed_pawns_black": 0,
+    "passed_pawns_white": 0,
+
+    "pawn_shield": 0,
+    "pawn_shield_black": 0,
+    "pawn_shield_white": 0,
+
+    "pawn_sqr_sum": 0,
+    "pawn_sqr_sum_black": 0,
+    "pawn_sqr_sum_white": 0,
+
+    "pieces_occupying_center": CENTER_OCCUPY_BONUS,
+
+    "queen_sqr_sum": 0,
+    "queen_sqr_sum_black": 0,
+    "queen_sqr_sum_white": 0,
+
+    "rook_sqr_sum": 0,
+    "rook_sqr_sum_black": 0,
+    "rook_sqr_sum_white": 0,
+
+    "sqr_sum_black":0,
+    "sqr_sum_white":0,
+    "target": 0,
+
+    "threat_balance": 0,
+    "threat_black": 0,
+    "threat_white": 0,
+}
 
 class FeatureExtractorN:
     def __init__(self, board: chess.Board, game_stage: int):
         self.board = board
-        self.feature_count = 60 # TODO: ADJUST TO INCLUDE ALL FEATURES
+        self.feature_count = 50
         self.features = [0 for _ in range(self.feature_count)]
+        # features used in ANN prediction
+        self.feature_functions = {
+            "attack_black": self.ft_attack_black,
+            "attack_white": self.ft_attack_white,
+            "bishop_pair_white": self.ft_bishop_pair_white,
+            "bishop_pair_black": self.ft_bishop_pair_black,
+            "center_attackers_white": self.ft_center_attackers_white,
+            "center_attackers_black": self.ft_center_attackers_black,
+            "connected_pawns": self.ft_connected_pawns,
+            "defense_balance": self.ft_defense_balance,
+            "doubled_pawns_black": self.ft_doubled_pawns_black,
+            "doubled_pawns_white": self.ft_doubled_pawns_white,
+            "half_open_king_files": self.ft_half_open_king_files,
+            "isolated_pawns_black": self.ft_isolated_pawns_black,
+            "isolated_pawns_white": self.ft_isolated_pawns_white,
+            "king_ring_enemy_pressure": self.ft_king_ring_enemy_pressure,
+            "material_bishop_white": self.ft_material_bishop_white,
+            "material_bishop_black": self.ft_material_bishop_black,
+            "material_knight_white": self.ft_material_knight_white,
+            "material_knight_black": self.ft_material_knight_black,
+            "material_pawn_white": self.ft_material_pawn_white,
+            "material_pawn_black": self.ft_material_pawn_black,
+            "material_queen_white": self.ft_material_queen_white,
+            "material_queen_black": self.ft_material_queen_black,
+            "material_rook_white": self.ft_material_rook_white,
+            "material_rook_black": self.ft_material_rook_black,
+            "mobility_black": self.ft_mobility_black,
+            "mobility_white": self.ft_mobility_white,
+            "mobility_safe_black": self.ft_mobility_safe_black,
+            "mobility_safe_white": self.ft_mobility_safe_white,
+            "outposts_white": self.ft_outposts_white,
+            "outposts_black": self.ft_outposts_black,
+            "passed_pawns": self.ft_passed_pawns,
+            "pawn_shield": self.ft_pawn_shield,
+            "pieces_occupying_center": self.ft_pieces_occupying_center,
+            "sqr_sum_black": self.ft_sqr_sum_black,
+            "sqr_sum_white": self.ft_sqr_sum_white,
+            "threat_black": self.ft_threat_black,
+            "threat_white": self.ft_threat_white,
+        }
         self.game_stage = game_stage
         self.material_extractor = mfe.MaterialFeatureExtractor(board, game_stage)
         self.pawn_extractor = kpfe.PawnFeatureExtractor(board, game_stage)
@@ -147,14 +256,357 @@ class FeatureExtractorN:
         self.pawn_extractor.set_board(board)
         self.king_extractor.set_board(board)
 
-    def ft_target(self) -> float:
-        info = self.engine.analyse(self.board, chess.engine.Limit(nodes=1))
-        score = info["score"].white()
-        cp = score.score(mate_score=9999)/100.0
+    def ft_attack_balance(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.ft_attack_balance())
+        return -sum(self.material_extractor.ft_attack_balance())
 
-        return -cp if self.board.turn == chess.BLACK else cp
+    def ft_attack_white(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.attack(chess.WHITE))
+        return -sum(self.material_extractor.attack(chess.WHITE))
 
-    # count and subtract number of white vs black pieces occupying the center
+    def ft_attack_black(self):
+        if self.board.turn == chess.BLACK:
+            return sum(self.material_extractor.attack(chess.BLACK))
+        return -sum(self.material_extractor.attack(chess.BLACK))
+
+
+    def ft_bishop_outposts_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.bishop_outposts(chess.WHITE)
+        return -(self.bishop_outposts(chess.WHITE))
+
+    def ft_bishop_outposts_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.bishop_outposts(chess.BLACK)
+        return -(self.bishop_outposts(chess.BLACK))
+
+
+    # check if white and black have both bishops
+    def bishop_pair(self, color:chess.Color) ->int:
+        return 1 if len(self.board.pieces(chess.BISHOP, color)) == 2 else 0
+
+    def ft_bishop_pair_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.bishop_pair(chess.WHITE)*BISHOP_PAIR_WEIGHT
+        return -(self.bishop_pair(chess.WHITE))*BISHOP_PAIR_WEIGHT
+
+    def ft_bishop_pair_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.bishop_pair(chess.BLACK)*BISHOP_PAIR_WEIGHT
+        return -(self.bishop_pair(chess.BLACK) )*BISHOP_PAIR_WEIGHT
+
+
+    def ft_bishop_sqr_sum(self) -> int:
+        return self.piece_sqr_sum(chess.BISHOP)
+
+    def ft_bishop_sqr_sum_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.piece_sqr_sum_color(chess.WHITE, chess.BISHOP, chess.BISHOP)
+        return -self.piece_sqr_sum_color(chess.WHITE, chess.BISHOP, chess.BISHOP)
+
+    def ft_bishop_sqr_sum_black(self):
+        if self.board.turn == chess.BLACK:
+            return  self.piece_sqr_sum_color(chess.BLACK, chess.BISHOP, chess.BISHOP)
+        return -self.piece_sqr_sum_color(chess.BLACK, chess.BISHOP, chess.BISHOP)
+
+
+    #  count and subtract number of white vs black pieces attacking the center
+    def center_attackers(self, color: chess.Color) :
+        attack_counts = np.zeros((1, 6), dtype=np.int32)
+
+        for target in CENTER:
+            for sq in self.board.attackers(color, target):
+                piece = self.board.piece_at(sq)
+                attack_counts[0][piece.piece_type - 1] += 1
+
+        return  np.sum(attack_counts * CENTER_ATTACK_WEIGHTS).item()
+
+    def ft_center_attackers_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.center_attackers(chess.WHITE)
+        return -self.center_attackers(chess.WHITE)
+
+    def ft_center_attackers_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.center_attackers(chess.BLACK)
+        return -self.center_attackers(chess.BLACK)
+
+
+    def ft_connected_pawns(self) -> int:
+        return self.pawn_extractor.connected_pawns()
+
+    def ft_connected_pawns_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.pawn_extractor.connected_pawns_color(chess.WHITE)
+        return -self.pawn_extractor.connected_pawns_color(chess.WHITE)
+
+    def ft_connected_pawns_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.pawn_extractor.connected_pawns_color(chess.BLACK)
+        return -self.pawn_extractor.connected_pawns_color(chess.BLACK)
+
+
+    def ft_defense_balance(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.ft_defense_balance())
+        return -sum(self.material_extractor.ft_defense_balance())
+
+    def ft_defense_white(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.defense(chess.WHITE))
+        return -sum(self.material_extractor.defense(chess.WHITE))
+
+    def ft_defense_black(self):
+        if self.board.turn == chess.BLACK:
+            return sum(self.material_extractor.defense(chess.BLACK))
+        return -sum(self.material_extractor.defense(chess.BLACK))
+
+
+    def ft_doubled_pawns(self) -> int:
+        return self.pawn_extractor.doubled_pawns()
+
+    def ft_doubled_pawns_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.pawn_extractor.doubled_pawns_color(chess.WHITE)
+        return -self.pawn_extractor.doubled_pawns_color(chess.WHITE)
+
+    def ft_doubled_pawns_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.pawn_extractor.doubled_pawns_color(chess.BLACK)
+        return -self.pawn_extractor.doubled_pawns_color(chess.BLACK)
+
+
+    def ft_half_open_king_files(self) -> int:
+        return self.king_extractor.half_open_king_files()
+
+    def ft_half_open_king_files_white(self) -> int:
+        if self.board.turn == chess.WHITE:
+            return self.king_extractor.half_open_king_files_color(chess.WHITE)
+        return -self.king_extractor.half_open_king_files_color(chess.WHITE)
+
+    def ft_half_open_king_files_black(self) -> int:
+        if self.board.turn == chess.BLACK:
+            return self.king_extractor.half_open_king_files_color(chess.BLACK)
+        return -self.king_extractor.half_open_king_files_color(chess.BLACK)
+
+
+    def ft_isolated_pawns(self) -> int:
+        return self.pawn_extractor.isolated_pawns()
+
+    def ft_isolated_pawns_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.pawn_extractor.isolated_pawns_color(chess.WHITE)
+        return -self.pawn_extractor.isolated_pawns_color(chess.WHITE)
+
+    def ft_isolated_pawns_black(self):
+        if self.board.turn == chess.BLACK:
+            return  self.pawn_extractor.isolated_pawns_color(chess.BLACK)
+        return -self.pawn_extractor.isolated_pawns_color(chess.BLACK)
+
+
+    def ft_king_ring_enemy_pressure(self) -> int:
+        return self.king_extractor.king_ring_enemy_pressure()
+
+    def ft_king_ring_enemy_pressure_white(self) -> int:
+        if self.board.turn == chess.WHITE:
+            return self.king_extractor.king_ring_enemy_pressure_color(chess.WHITE)
+        return -self.king_extractor.king_ring_enemy_pressure_color(chess.WHITE)
+
+    def ft_king_ring_enemy_pressure_black(self) -> int:
+        if self.board.turn == chess.BLACK:
+            return self.king_extractor.king_ring_enemy_pressure_color(chess.BLACK)
+        return -self.king_extractor.king_ring_enemy_pressure_color(chess.BLACK)
+
+
+    def ft_king_sqr_sum(self) -> int:
+        if self.game_stage != END_GAME :
+            return self.piece_sqr_sum(chess.KING)
+        return self.piece_sqr_sum("king_end")
+
+    def ft_king_sqr_sum_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.piece_sqr_sum_color(chess.WHITE, chess.KING, chess.KING)
+        return -self.piece_sqr_sum_color(chess.WHITE, chess.KING, chess.KING)
+
+    def ft_king_sqr_sum_black(self):
+        if self.board.turn == chess.BLACK:
+            return  self.piece_sqr_sum_color(chess.BLACK, chess.KING, chess.KING)
+        return -self.piece_sqr_sum_color(chess.BLACK, chess.KING, chess.KING)
+
+
+    def ft_knight_outposts_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.knight_outposts(chess.WHITE)
+        return -(self.knight_outposts(chess.WHITE))
+
+    def ft_knight_outposts_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.knight_outposts(chess.BLACK)
+        return -(self.knight_outposts(chess.BLACK))
+
+
+    def ft_knight_sqr_sum(self) -> int:
+        return self.piece_sqr_sum(chess.KNIGHT)
+
+    def ft_knight_sqr_sum_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.piece_sqr_sum_color(chess.WHITE, chess.KNIGHT, chess.KNIGHT)
+        return -self.piece_sqr_sum_color(chess.WHITE, chess.KNIGHT, chess.KNIGHT)
+
+    def ft_knight_sqr_sum_black(self):
+        if self.board.turn == chess.BLACK:
+            return  self.piece_sqr_sum_color(chess.BLACK, chess.KNIGHT, chess.KNIGHT)
+        return -self.piece_sqr_sum_color(chess.BLACK, chess.KNIGHT, chess.KNIGHT)
+
+
+    def ft_material_bishop_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.material_balance_white[2]
+        return -self.material_balance_white[2]
+
+    def ft_material_bishop_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.material_balance_black[2]
+        return -self.material_balance_black[2]
+
+
+    def ft_material_knight_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.material_balance_white[1]
+        return -self.material_balance_white[1]
+
+    def ft_material_knight_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.material_balance_black[1]
+        return -self.material_balance_black[1]
+
+
+    def ft_material_pawn_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.material_balance_white[0]
+        return -self.material_balance_white[0]
+
+    def ft_material_pawn_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.material_balance_black[0]
+        return -self.material_balance_black[0]
+
+
+    def ft_material_queen_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.material_balance_white[4]
+        return -self.material_balance_white[4]
+
+    def ft_material_queen_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.material_balance_black[4]
+        return -self.material_balance_black[4]
+        # if self.board.turn == chess.BLACK:
+        #     return self.material_extractor.material_balance(chess.BLACK)[4]
+        # return -self.material_extractor.material_balance(chess.BLACK)[4]
+
+    def ft_material_rook_white(self):
+        if self.board.turn == chess.WHITE:
+            return self.material_balance_white[3]
+        return -self.material_balance_white[3]
+
+    def ft_material_rook_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.material_balance_black[3]
+        return -self.material_balance_black[3]
+
+    def ft_mobility_balance(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.ft_mobility_balance())
+        return -sum(self.material_extractor.ft_mobility_balance())
+
+    def ft_mobility_white(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.mobility_color(chess.WHITE))
+        return -sum(self.material_extractor.mobility_color(chess.WHITE))
+
+    def ft_mobility_black(self):
+        if self.board.turn == chess.BLACK:
+            return sum(self.material_extractor.mobility_color(chess.BLACK))
+        return -sum(self.material_extractor.mobility_color(chess.BLACK))
+
+    def ft_mobility_safe_balance(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.ft_mobility_safe_balance())
+        return -sum(self.material_extractor.ft_mobility_safe_balance())
+
+    def ft_mobility_safe_white(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.mobility_color(chess.WHITE,
+                                                              safety=True))
+        return -sum(
+            self.material_extractor.mobility_color(chess.WHITE, safety=True))
+
+    def ft_mobility_safe_black(self):
+        if self.board.turn == chess.BLACK:
+            return sum(self.material_extractor.mobility_color(chess.BLACK,
+                                                              safety=True))
+        return -sum(
+            self.material_extractor.mobility_color(chess.BLACK, safety=True))
+
+
+    def ft_outposts_white(self) -> int:
+        if self.board.turn == chess.WHITE:
+            return self.bishop_outposts(chess.WHITE) + self.knight_outposts(chess.WHITE)
+        return -(self.bishop_outposts(chess.WHITE) + self.knight_outposts(
+            chess.WHITE))
+
+    def ft_outposts_black(self) -> int:
+        if self.board.turn == chess.BLACK:
+            return self.bishop_outposts(chess.BLACK) + self.knight_outposts(chess.BLACK)
+        return -(self.bishop_outposts(chess.BLACK) + self.knight_outposts(
+            chess.BLACK))
+
+
+    def ft_passed_pawns(self):
+        return self.pawn_extractor.passed_pawns()
+
+    def ft_passed_pawns_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.pawn_extractor.passed_pawns_color(chess.WHITE)
+        return -self.pawn_extractor.passed_pawns_color(chess.WHITE)
+
+    def ft_passed_pawns_black(self):
+        if self.board.turn == chess.BLACK:
+            return self.pawn_extractor.passed_pawns_color(chess.BLACK)
+        return -self.pawn_extractor.passed_pawns_color(chess.BLACK)
+
+
+    def ft_pawn_shield(self) -> int:
+        return self.king_extractor.pawn_shield()
+
+    def ft_pawn_shield_white(self) -> int:
+        if self.board.turn == chess.WHITE:
+            return self.king_extractor.pawn_shield_color(chess.WHITE)
+        return -self.king_extractor.pawn_shield_color(chess.WHITE)
+
+    def ft_pawn_shield_black(self) -> int:
+        if self.board.turn == chess.BLACK:
+            return self.king_extractor.pawn_shield_color(chess.BLACK)
+        return -self.king_extractor.pawn_shield_color(chess.BLACK)
+
+
+    def ft_pawn_sqr_sum(self) -> int:
+        return self.piece_sqr_sum(chess.PAWN)
+
+    def ft_pawn_sqr_sum_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.piece_sqr_sum_color(chess.WHITE, chess.PAWN, chess.PAWN)
+        return -self.piece_sqr_sum_color(chess.WHITE, chess.PAWN, chess.PAWN)
+
+    def ft_pawn_sqr_sum_black(self):
+        if self.board.turn == chess.BLACK:
+            return  self.piece_sqr_sum_color(chess.BLACK, chess.PAWN, chess.PAWN)
+        return -self.piece_sqr_sum_color(chess.BLACK, chess.PAWN, chess.PAWN)
+
+
     def ft_pieces_occupying_center(self) -> np.array:
         pieces_occupy_center = np.zeros(6, dtype=float)
         for sq in CENTER:
@@ -167,42 +619,78 @@ class FeatureExtractorN:
                     pieces_occupy_center[piece_idx] += 1
                 else:  # opponent's piece
                     pieces_occupy_center[piece_idx] -= 1
-        return pieces_occupy_center
 
-    #  count and subtract number of white vs black pieces attacking the center
-    def center_attackers(self, color: chess.Color) :
-        attack_counts = np.zeros((1, 6), dtype=np.int32)
+        return np.sum(pieces_occupy_center * CENTER_OCCUPY_BONUS).item()
 
-        for target in CENTER:
-            for sq in self.board.attackers(color, target):
-                piece = self.board.piece_at(sq)
-                attack_counts[0][piece.piece_type - 1] += 1
 
-        return attack_counts
+    def ft_queen_sqr_sum(self) -> int:
+        return self.piece_sqr_sum(chess.QUEEN)
 
-    def ft_center_attackers_white(self):
+    def ft_queen_sqr_sum_white(self):
         if self.board.turn == chess.WHITE:
-            return self.center_attackers(chess.WHITE)
-        return -self.center_attackers(chess.WHITE)
+            return  self.piece_sqr_sum_color(chess.WHITE, chess.QUEEN, chess.QUEEN)
+        return -self.piece_sqr_sum_color(chess.WHITE, chess.QUEEN, chess.QUEEN)
 
-    def ft_center_attackers_black(self):
+    def ft_queen_sqr_sum_black(self):
         if self.board.turn == chess.BLACK:
-            return self.center_attackers(chess.BLACK)
-        return -self.center_attackers(chess.BLACK)
+            return  self.piece_sqr_sum_color(chess.BLACK, chess.QUEEN, chess.QUEEN)
+        return -self.piece_sqr_sum_color(chess.BLACK, chess.QUEEN, chess.QUEEN)
 
-    # check if white and black have both bishops
-    def bishop_pair(self, color:chess.Color) ->int:
-        return 1 if len(self.board.pieces(chess.BISHOP, color)) == 2 else 0
 
-    def ft_bishop_pair_white(self):
+    def ft_rook_sqr_sum(self) -> int:
+        return self.piece_sqr_sum(chess.ROOK)
+
+    def ft_rook_sqr_sum_white(self):
         if self.board.turn == chess.WHITE:
-            return self.bishop_pair(chess.WHITE)
-        return -(self.bishop_pair(chess.WHITE) )
+            return  self.piece_sqr_sum_color(chess.WHITE, chess.ROOK, chess.ROOK)
+        return -self.piece_sqr_sum_color(chess.WHITE, chess.ROOK, chess.ROOK)
 
-    def ft_bishop_pair_black(self):
+    def ft_rook_sqr_sum_black(self):
         if self.board.turn == chess.BLACK:
-            return self.bishop_pair(chess.BLACK)
-        return -(self.bishop_pair(chess.BLACK) )
+            return  self.piece_sqr_sum_color(chess.BLACK, chess.ROOK, chess.ROOK)
+        return -self.piece_sqr_sum_color(chess.BLACK, chess.ROOK, chess.ROOK)
+
+    def sqr_sum_color(self, color):
+        piece_types = [chess.PAWN, chess.BISHOP, chess.ROOK, chess.KNIGHT,
+                       chess.KING, chess.QUEEN]
+        ss = 0
+        for p in piece_types:
+            ss += self.piece_sqr_sum_color(color, p, p)
+        return ss
+
+    def ft_sqr_sum_black(self):
+        if self.board.turn == chess.BLACK:
+            return  self.sqr_sum_color(chess.BLACK)
+        return -self.sqr_sum_color(chess.BLACK)
+
+    def ft_sqr_sum_white(self):
+        if self.board.turn == chess.WHITE:
+            return  self.sqr_sum_color(chess.WHITE)
+        return -self.sqr_sum_color(chess.WHITE)
+
+    def ft_target(self) -> float:
+        info = self.engine.analyse(self.board, chess.engine.Limit(nodes=1))
+        score = info["score"].white()
+        cp = score.score(mate_score=9999)/100.0
+
+        return -cp if self.board.turn == chess.BLACK else cp
+
+
+    def ft_threat_balance(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.ft_threat_balance())
+        return -sum(self.material_extractor.ft_threat_balance())
+
+    def ft_threat_white(self):
+        if self.board.turn == chess.WHITE:
+            return sum(self.material_extractor.threat(chess.WHITE))
+        return -sum(self.material_extractor.threat(chess.WHITE))
+
+    def ft_threat_black(self):
+        if self.board.turn == chess.BLACK:
+            return sum(self.material_extractor.threat(chess.BLACK))
+        return -sum(self.material_extractor.threat(chess.BLACK))
+
 
     def outpost(self, piece_type: chess.PieceType, color: chess.Color)->int:
         outpost = 0
@@ -242,18 +730,6 @@ class FeatureExtractorN:
     # count and subtract the number of bishop outposts white vs. black
     def bishop_outposts(self, color: chess.Color) ->int:
         return self.outpost(chess.BISHOP, color)*BISHOP_OUTPOST_WEIGHT
-
-    def ft_outposts_white(self) -> int:
-        if self.board.turn == chess.WHITE:
-            return self.bishop_outposts(chess.WHITE) + self.knight_outposts(chess.WHITE)
-        return -(self.bishop_outposts(chess.WHITE) + self.knight_outposts(
-            chess.WHITE))
-
-    def ft_outposts_black(self) -> int:
-        if self.board.turn == chess.BLACK:
-            return self.bishop_outposts(chess.BLACK) + self.knight_outposts(chess.BLACK)
-        return -(self.bishop_outposts(chess.BLACK) + self.knight_outposts(
-            chess.BLACK))
 
     def passed_pawns(self):
         white_pawns = self.board.pieces(chess.PAWN, chess.WHITE)
@@ -312,130 +788,16 @@ class FeatureExtractorN:
             return ret
         return -ret
 
-    def ft_pawn_sqr_sum(self) -> int:
-        return self.piece_sqr_sum(chess.PAWN)
-
-    def knight_sqr_sum(self) -> int:
-        return self.piece_sqr_sum(chess.KNIGHT)
-
-    def bishop_sqr_sum(self) -> int:
-        return self.piece_sqr_sum(chess.BISHOP)
-
-    def rook_sqr_sum(self) -> int:
-        return self.piece_sqr_sum(chess.ROOK)
-
-    def ft_queen_sqr_sum(self) -> int:
-        return self.piece_sqr_sum(chess.QUEEN)
-
-    def king_sqr_sum(self) -> int:
-        if self.game_stage != END_GAME :
-            return self.piece_sqr_sum(chess.KING)
-        return self.piece_sqr_sum("king_end")
-
-    def ft_bknrk_sqr_sum(self) -> int:
-        return self.bishop_sqr_sum() + self.knight_sqr_sum() + self.rook_sqr_sum() + self.king_sqr_sum()
-
-    def ft_passed_pawns(self):
-        return self.pawn_extractor.passed_pawns()
-    
-    def ft_doubled_pawns(self) -> int:
-        return self.pawn_extractor.doubled_pawns()
-        
-    # def ft_isolated_pawns(self) -> int:
-    #     return self.pawn_extractor.isolated_pawns()
-        
-    def ft_connected_pawns(self) -> int:
-        return self.pawn_extractor.connected_pawns()
-        
-    def ft_pawn_shield(self) -> int:
-        return self.king_extractor.pawn_shield()
-    
-    def ft_half_open_king_files(self) -> int:
-        return self.king_extractor.half_open_king_files()
-        
-    def ft_king_ring_enemy_pressure(self) -> int:
-        return self.king_extractor.king_ring_enemy_pressure()
-
-    def ft_material_pawn_white(self):
-        if self.board.turn == chess.WHITE:
-            return self.material_extractor.material_balance(chess.WHITE)[0]
-        return -self.material_extractor.material_balance(chess.WHITE)[0]
-
-    def ft_material_pawn_black(self):
-        if self.board.turn == chess.BLACK:
-            return self.material_extractor.material_balance(chess.BLACK)[0]
-        return -self.material_extractor.material_balance(chess.BLACK)[0]
-
-    def ft_material_knight_white(self):
-        if self.board.turn == chess.WHITE:
-            return self.material_extractor.material_balance(chess.WHITE)[1]
-        return -self.material_extractor.material_balance(chess.WHITE)[1]
-
-    def ft_material_knight_black(self):
-        if self.board.turn == chess.BLACK:
-            return self.material_extractor.material_balance(chess.BLACK)[1]
-        return -self.material_extractor.material_balance(chess.BLACK)[1]
-
-    def ft_material_bishop_white(self):
-        if self.board.turn == chess.WHITE:
-            return self.material_extractor.material_balance(chess.WHITE)[2]
-        return -self.material_extractor.material_balance(chess.WHITE)[2]
-
-    def ft_material_bishop_black(self):
-        if self.board.turn == chess.BLACK:
-            return self.material_extractor.material_balance(chess.BLACK)[2]
-        return -self.material_extractor.material_balance(chess.BLACK)[2]
-
-    def ft_material_rook_white(self):
-        if self.board.turn == chess.WHITE:
-            return self.material_extractor.material_balance(chess.WHITE)[3]
-        return -self.material_extractor.material_balance(chess.WHITE)[3]
-
-    def ft_material_rook_black(self):
-        if self.board.turn == chess.BLACK:
-            return self.material_extractor.material_balance(chess.BLACK)[3]
-        return -self.material_extractor.material_balance(chess.BLACK)[3]
-
-    def ft_material_queen_white(self):
-        if self.board.turn == chess.WHITE:
-            return self.material_extractor.material_balance(chess.WHITE)[4]
-        return -self.material_extractor.material_balance(chess.WHITE)[4]
-
-    def ft_material_queen_black(self):
-        if self.board.turn == chess.BLACK:
-            return self.material_extractor.material_balance(chess.BLACK)[4]
-        return -self.material_extractor.material_balance(chess.BLACK)[4]
-
-
-    def ft_mobility_balance(self, safety=False):
-        if self.board.turn == chess.WHITE:
-            return sum(self.material_extractor.ft_mobility_balance())
-        return -sum(self.material_extractor.ft_mobility_balance())
-
-    def ft_mobility_safe_balance(self):
-        if self.board.turn == chess.WHITE:
-            return sum(self.material_extractor.ft_mobility_safe_balance())
-        return -sum(self.material_extractor.ft_mobility_safe_balance())
-
-    def ft_attack_balance(self):
-        if self.board.turn == chess.WHITE:
-            return sum(self.material_extractor.ft_attack_balance())
-        return -sum(self.material_extractor.ft_attack_balance())
-
-    def ft_threat_balance(self):
-        if self.board.turn == chess.WHITE:
-            return sum(self.material_extractor.ft_threat_balance())
-        return -sum(self.material_extractor.ft_threat_balance())
-
-    def ft_defense_balance(self):
-        if self.board.turn == chess.WHITE:
-            return sum(self.material_extractor.ft_defense_balance())
-        return -sum(self.material_extractor.ft_defense_balance())
+    # call before any ft_material function to set the material value vectors for black and white
+    def set_material_balances(self):
+        self.material_balance_white = self.material_extractor.material_balance(chess.WHITE)
+        self.material_balance_black = self.material_extractor.material_balance(chess.BLACK)
 
     def get_features(self):
         i = 0
         for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
             if not name.startswith("ft_"): continue
+
             vec = method()
 
             if name.endswith("pieces_occupying_center") or name.endswith("center_attackers_white")or name.endswith("center_attackers_black"):
@@ -448,18 +810,27 @@ class FeatureExtractorN:
             else:
                 self.features[i] = vec
             i += 1
-
         return self.features[:i]
 
+    def get_features_subset_dict(self, feature_names):
+        self.set_material_balances()
+        result = {}
+        for name in feature_names:
+            if name not in self.feature_functions:
+                result[name] = 0.0
+            else:
+                result[name] = self.feature_functions[name]()
+        return result
 
 def mirror_square(sq: int) -> int:
     return ((7 - (sq // 8)) * 8) + (sq % 8)
 
 
-def write_features_file(input_file='positions.csv',output_file='positions_with_features2.csv',):
+def write_features_file(input_file='positions.csv',output_file='positions_with_features_NEW.csv',):
     fe = FeatureExtractorN(chess.Board(), 0)
     feature_names = list(feature_weights.keys())
     feature_names.sort()
+
     with open(input_file, 'r', encoding='utf-8') as src, open(output_file, 'w', encoding='utf-8', newline='') as dst:
         header = src.readline().rstrip('\n')
         dst.write(header + ',' + ','.join(feature_names) + '\n')
@@ -475,6 +846,7 @@ def write_features_file(input_file='positions.csv',output_file='positions_with_f
 
             fe.set_board(chess.Board(fen))
             features = fe.get_features()
+
             if len(features) != len(feature_names):
                 raise ValueError(
                     f"FeatureExtractor returned {len(features)} values, "
@@ -489,9 +861,10 @@ def write_features_file(input_file='positions.csv',output_file='positions_with_f
     fe.engine.quit()
 
 
-write_features_file()
+# write_features_file()
 
 # fe = FeatureExtractorN(chess.Board("rnbqkbnr/ppp2ppp/4p3/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3"), EARLY_GAME)
 # print(fe.ft_target())
 # print(fe.get_features())
+# print(len(fe.get_features()))
 # fe.engine.quit()

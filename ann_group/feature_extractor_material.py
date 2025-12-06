@@ -46,7 +46,6 @@ class MaterialFeatureExtractor:
                 scores.append(side * v * (len(board.pieces(piece_type, chess.WHITE)) - len(board.pieces(piece_type, chess.BLACK))))
         return scores
 
-
     def material_balance(self, color):
         board = self.board
         scores = []
@@ -89,9 +88,19 @@ class MaterialFeatureExtractor:
             scores[i] -= scores_other[i]
         return scores
 
+    def mobility_color(self, color: chess.Color, safety=False):
+        if self.board.turn == color:
+            return self.ft_mobility_one_side(safety)
+        board = self.board
+        board.push(chess.Move.null())
+        scores_other = self.ft_mobility_one_side(safety)
+        board.pop()
+        return scores_other
+
     def ft_mobility_safe_one_side(self):
         # total number of safe legal squares each piece type can move to for the current player
         return self.ft_mobility_one_side(True)
+
 
     def ft_mobility_safe_balance(self):
         # difference in total number of safe legal squares each piece type can move to between the players
@@ -117,6 +126,15 @@ class MaterialFeatureExtractor:
             scores[i] -= scores_other[i]
         return scores
 
+    def attack(self, color:chess.Color):
+        # total number of squares attacked by each piece type for the current player
+        board = self.board
+        scores = [0] * 6
+        for piece_type in chess.PIECE_TYPES:
+            for square in board.pieces(piece_type, color):
+                scores[piece_type - 1] += len(board.attacks(square))
+        return scores
+
     def ft_threat_one_side(self):
         # total number of opponent pieces threatened by each piece type for the current player
         board = self.board
@@ -140,6 +158,17 @@ class MaterialFeatureExtractor:
             scores[i] -= scores_other[i]
         return scores
 
+    def threat(self, color:chess.Color):
+        board = self.board
+        scores = [0] * 6
+        for piece_type in chess.PIECE_TYPES:
+            for square in board.pieces(piece_type, color):
+                for attacked_square in board.attacks(square):
+                    attacked_piece = board.piece_at(attacked_square)
+                    if attacked_piece and attacked_piece.color != board.turn:
+                        scores[piece_type - 1] += 1
+        return scores
+
     def ft_defense_one_side(self):
         # total number of friendly pieces defending each piece type for the current player
         board = self.board
@@ -159,4 +188,13 @@ class MaterialFeatureExtractor:
         board.pop()
         for i in range(len(scores)):
             scores[i] -= scores_other[i]
+        return scores
+
+    def defense(self, color):
+        board = self.board
+        scores = [0] * 6
+        for piece_type in chess.PIECE_TYPES:
+            for square in board.pieces(piece_type,color):
+                defenders = board.attackers(board.turn, square)
+                if defenders: scores[piece_type - 1] += len(defenders)
         return scores

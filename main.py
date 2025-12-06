@@ -4,11 +4,14 @@ import chess
 import chess.engine
 import csv
 from pathlib import Path
+import os
+import shutil
 import time
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate
 from minimax_group.minimax_new import FastMinimaxBot
 import env_variables as env
+from chess.engine import SimpleEngine, Info
 
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
@@ -24,7 +27,7 @@ HILITE_RGBA = (255, 255, 0, 90)
 
 
 # Stockfish: set path when you’re ready
-STOCKFISH_LIMIT = chess.engine.Limit(time=2)  # or depth=12, nodes=...
+STOCKFISH_LIMIT = chess.engine.Limit(time=2.0)  # or depth=12, nodes=...
 STOCKFISH_ELO = 1900
 
 # How long to display result screen (ms)
@@ -38,6 +41,33 @@ PIECE_GLYPHS = {
     chess.QUEEN:  ("Q", "q"),
     chess.KING:   ("K", "k"),
 }
+
+
+def load_stockfish():
+    # 1. Try system-installed Stockfish
+    system_path = shutil.which("stockfish")
+    if system_path:
+        print("[INFO] Using system Stockfish:", system_path)
+        try:
+            return SimpleEngine.popen_uci(system_path)
+        except Exception as e:
+            print("[WARN] Failed to load system Stockfish:", e)
+
+    # 2. Fall back to bundled binary inside repo
+    root = os.path.dirname(os.path.abspath(__file__))
+    local_path = os.path.join(root, "stockfish", "stockfish","stockfish-windows-x86-64-avx2.exe")
+
+    if os.path.exists(local_path):
+        print("[INFO] Using bundled Stockfish:", local_path)
+        try:
+            return SimpleEngine.popen_uci(local_path)
+        except Exception as e:
+            print("[ERROR] Failed to launch bundled Stockfish:", e)
+
+    # 3. If everything failed
+    print("[ERROR] No Stockfish available. Minimax-only mode.")
+    return None
+
 
 
 def get_square_from_xy(x: int, y: int) -> chess.Square:
@@ -86,14 +116,7 @@ class ChessGame:
 
         self.engine = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
-            if env.STOCKFISH_PATH:
-                try:
-                    self.engine = chess.engine.SimpleEngine.popen_uci(env.STOCKFISH_PATH)
-                except Exception as e:
-                    print(f"[WARN] Could not start Stockfish: {e}")
-                    self.engine = None
-            else:
-                print("[INFO] env.STOCKFISH_PATH not set; Stockfish disabled for this run.")
+            self.engine = load_stockfish()
 
         if self.engine:
             try:
@@ -101,6 +124,10 @@ class ChessGame:
                 self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
             except Exception as e:
                 print(f"[WARN] Could not configure Stockfish options: {e}")
+
+        self.engine_analyze = None
+        if self.white_player == "stockfish" or self.black_player == "stockfish":
+            self.engine_analyze = load_stockfish()
 
     def draw_board(self):
         for r in range(8):
@@ -331,13 +358,14 @@ class ChessGame:
         return made_move
 
     def _sf_analyse(self, board: chess.Board, pov_color: chess.Color | None = None) -> dict | None:
-        if not self.engine:
+        if not self.engine_analyze:
             return None
 
-        info = self.engine.analyse(
+        # Ask python-chess for all available info (new API uses Info flags, not strings)
+        info = self.engine_analyze.analyse(
             board,
             STOCKFISH_LIMIT,
-            info=["depth", "nodes", "nps", "time", "score", "pv"],
+            info=Info.ALL,
         )
 
         eval_cp = None
@@ -365,6 +393,22 @@ class ChessGame:
             "time": info.get("time"),
             "best_move": best_move,
         }
+
+    def _extract_eval_cp(self, info: dict, pov_color: chess.Color) -> int | None:
+        score = info.get("score")
+        if score is None:
+            return None
+
+        pov = score.pov(pov_color)
+
+        if pov.is_mate():
+            mate_in = pov.mate()
+            if mate_in is not None:
+                sign = 1 if mate_in > 0 else -1
+                return sign * 100000
+            return None
+        else:
+            return pov.score()
 
     def log_minimax_move(self, move: chess.Move, move_san: str, color: chess.Color,
                          elapsed: float,
@@ -506,7 +550,7 @@ class ChessGame:
         color_to_move = self.board.turn  # who is about to move (for logging)
 
         # 1) Stockfish eval BEFORE Minimax move (pre_info)
-        pre_info = self._sf_analyse(self.board, pov_color=color_to_move) if self.engine else None
+        pre_info = self._sf_analyse(self.board, pov_color=color_to_move) if self.engine_analyze else None
 
         # 2) Let Minimax search
         start = time.perf_counter()
@@ -521,7 +565,7 @@ class ChessGame:
             self.last_move_squares = [mv.from_square, mv.to_square]
 
             # 3) Stockfish eval AFTER Minimax move (post_info)
-            post_info = self._sf_analyse(self.board, pov_color=color_to_move) if self.engine else None
+            post_info = self._sf_analyse(self.board, pov_color=color_to_move) if self.engine_analyze else None
 
             # 4) Update per-game stats
             self.minimax_time_total += elapsed
@@ -555,45 +599,52 @@ class ChessGame:
 
     def play_stockfish_turn(self):
         if not self.engine:
-            # Fallback: just let Minimax move if no engine
             self.play_minimax_turn()
             return
 
         color_to_move = self.board.turn
 
-        try:
-            start = time.perf_counter()
-            result = self.engine.play(self.board, STOCKFISH_LIMIT)
-            elapsed = time.perf_counter() - start
+        # Single search: get move + stats in one call
+        start = time.perf_counter()
+        result = self.engine.play(
+            self.board,
+            STOCKFISH_LIMIT,
+            info=Info.ALL,
+        )
+        elapsed = time.perf_counter() - start
 
-            if result and result.move:
-                mv = result.move
-                san_str = self.board.san(mv)
-                self.board.push(mv)
-                print(f"Stockfish played: {san_str}  (t = {elapsed:.3f}s)")
-                self.last_move = mv
-                self.last_move_squares = [mv.from_square, mv.to_square]
+        mv = result.move
+        sf_info = result.info
 
-                # Analyze the resulting position for SF stats
-                info = self._sf_analyse(self.board)
+        if mv is None:
+            print("[WARN] Stockfish play() did not return a move")
+            return
 
-                # Update per-game Stockfish timing stats
-                self.stockfish_time_total += elapsed
-                self.stockfish_moves += 1
+        san_str = self.board.san(mv)
+        self.board.push(mv)
+        print(f"Stockfish played: {san_str}  (t = {elapsed:.3f}s)")
+        self.last_move = mv
+        self.last_move_squares = [mv.from_square, mv.to_square]
 
-                # Log per-move SF data
-                self.log_stockfish_move(
-                    move=mv,
-                    move_san=san_str,
-                    color=color_to_move,
-                    elapsed=elapsed,
-                    info=info,
-                )
+        # Update timing stats
+        self.stockfish_time_total += elapsed
+        self.stockfish_moves += 1
 
-        except Exception as e:
-            print(f"[WARN] Stockfish error: {e}")
-            # Optional: fallback to Minimax
-            # self.play_minimax_turn()
+        # Log using the same info dict
+        self.log_stockfish_move(
+            move=mv,
+            move_san=san_str,
+            color=color_to_move,
+            elapsed=elapsed,
+            info={
+                "eval_cp": self._extract_eval_cp(sf_info, pov_color=color_to_move),
+                "depth": sf_info.get("depth"),
+                "nodes": sf_info.get("nodes"),
+                "nps": sf_info.get("nps"),
+                "time": sf_info.get("time"),
+                "best_move": mv,  # PV[0] is effectively this move
+            },
+        )
 
     # ---------- main loop ----------
     # In ChessGame
@@ -815,9 +866,8 @@ def run_batch(num_games=10):
 def main():
     # Choose players per side: "human", "minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    game = ChessGame(white_player="minimax", black_player="human", minimax_depth=5)
-    game.play()
-    # run_batch(num_games=10)
+    game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=5)
+    run_batch(num_games=10)
 
 if __name__ == "__main__":
     main()

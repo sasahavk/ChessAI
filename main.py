@@ -12,6 +12,8 @@ from minimax_group.evaluate import evaluate
 from minimax_group.minimax_new import FastMinimaxBot
 import env_variables as env
 from chess.engine import SimpleEngine, Info
+from ann_group.ann_eval import model_path, scaler_x_path, scaler_y_path, trained_features_path, ann
+from ann_group.feature_extractor import FeatureExtractorN
 
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
@@ -84,7 +86,7 @@ class ChessGame:
       - "minimax": our Python Minimax
       - "stockfish": external engine (if env.STOCKFISH_PATH is set)
     """
-    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4, flip_board=False):
+    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4,ann_minimax_depth=2, flip_board=False):
         self.white_player = white_player
         self.black_player = black_player
 
@@ -108,6 +110,9 @@ class ChessGame:
         self.minimax_moves = 0
         self.minimax_new_time_total = 0.0
         self.minimax_new_moves = 0
+
+        self.ann = ann(model_path, scaler_x_path, scaler_y_path, trained_features_path)
+        self.ann_minimax = MinimaxBot(depth=ann_minimax_depth, eval_fn=self.ann.eval)
 
         self.move_log: list[dict] = []
 
@@ -597,6 +602,18 @@ class ChessGame:
             self.minimax_new_time_total += elapsed
             self.minimax_new_moves += 1
 
+    def play_ann_minimax_turn(self):
+        start = time.perf_counter()
+        mv = self.ann_minimax.play(self.board)
+        elapsed = time.perf_counter() - start
+
+        if mv:
+            san_str = self.board.san(mv)
+            self.board.push(mv)
+            print(f"Ann Minimax played: {san_str}  (t = {elapsed:.3f}s)")
+            self.last_move = mv
+            self.last_move_squares = [mv.from_square, mv.to_square]
+
     def play_stockfish_turn(self):
         if not self.engine:
             self.play_minimax_turn()
@@ -701,6 +718,8 @@ class ChessGame:
                         self.play_minimax_new_turn()
                     elif self.white_player == "stockfish":
                         self.play_stockfish_turn()
+                    elif self.white_player == "ann_minimax":
+                        self.play_ann_minimax_turn()
                 elif self.board.turn == chess.BLACK and self.black_player != "human":
                     if self.black_player == "minimax":
                         self.play_minimax_turn()
@@ -708,6 +727,8 @@ class ChessGame:
                         self.play_minimax_new_turn()
                     elif self.black_player == "stockfish":
                         self.play_stockfish_turn()
+                    elif self.white_player == "ann_minimax":
+                        self.play_ann_minimax_turn()
 
             if render:
                 self.draw_board()
@@ -727,6 +748,8 @@ class ChessGame:
             winner = "black" if self.board.turn == chess.WHITE else "white"
         else:
             winner = "draw"
+
+        return
 
         # Termination type
         if outcome and outcome.termination:
@@ -864,9 +887,9 @@ def run_batch(num_games=10):
 
 
 def main():
-    # Choose players per side: "human", "minimax", or "stockfish"
+    # Choose players per side: "human", "minimax", "ann_minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    game = ChessGame(white_player="minimax", black_player="stockfish", minimax_depth=5)
+    game = ChessGame(white_player="human", black_player="stockfish", minimax_depth=5)
     run_batch(num_games=10)
 
 if __name__ == "__main__":

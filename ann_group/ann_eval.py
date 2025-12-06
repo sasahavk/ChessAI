@@ -5,8 +5,7 @@ import numpy as np
 from keras.saving import load_model
 import time
 import warnings
-import feature_extractor
-from feature_extractor import FeatureExtractorN
+import  ann_group.feature_extractor as ann_fe
 from minimax_group import minimax_bot
 
 warnings.filterwarnings("ignore",  message="X does not have valid feature names")
@@ -23,7 +22,7 @@ class ann:
         self.scaler_x = joblib.load(scaler_x_path)
         self.scaler_y = joblib.load(scaler_y_path)
         self.features = joblib.load(trained_features_path)
-        self.fe = FeatureExtractorN(chess.Board(), feature_extractor.EARLY_GAME)
+        self.fe = ann_fe.FeatureExtractorN(chess.Board(), ann_fe.EARLY_GAME)
         self.features_dict = {}
         self.model_features_dict = {}
         self.df_input = pd.DataFrame()
@@ -41,16 +40,16 @@ class ann:
         return float(y_pred.item())
 
 
-sann = ann(model_path, scaler_x_path, scaler_y_path, trained_features_path)
+# sann = ann(model_path, scaler_x_path, scaler_y_path, trained_features_path)
 # print(sann.eval(chess.Board("1r2kb1r/p1q2ppp/2p1p3/1bNpPn2/3P2P1/1P3N2/P4P1P/1RBQR1K1 b k - 0 16")))
 
-for i in range(1,5):
-    bot = minimax_bot.MinimaxBot(depth=i, eval_fn=sann.eval)
-    start = time.perf_counter()
-    move = bot.play(chess.Board("1r2kb1r/p1q2ppp/2p1p3/1bNpPn2/3P2P1/1P3N2/P4P1P/1RBQR1K1 b k - 0 16"))
-    end = time.perf_counter()
-    print(f"---Time ({i}: {end - start:.4f} seconds")
-    print(f"---Move: {move}")
+# for i in range(1,5):
+#     bot = minimax_bot.MinimaxBot(depth=i, eval_fn=sann.eval)
+#     start = time.perf_counter()
+#     move = bot.play(chess.Board("1r2kb1r/p1q2ppp/2p1p3/1bNpPn2/3P2P1/1P3N2/P4P1P/1RBQR1K1 b k - 0 16"))
+#     end = time.perf_counter()
+#     print(f"---Time ({i}: {end - start:.4f} seconds")
+#     print(f"---Move: {move}")
 
 
 def benchmark_ann(ann_obj, num_positions=10_0):

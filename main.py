@@ -44,7 +44,14 @@ PIECE_GLYPHS = {
 
 
 def load_stockfish():
-    # 1. Try system-installed Stockfish
+    # 1. try to use stockfish path defined in env_variables.py
+    print("[INFO] Using Stockfish defined in env_variables.py:", env.STOCKFISH_PATH)
+    try:
+        return SimpleEngine.popen_uci(env.STOCKFISH_PATH)
+    except Exception as e:
+        print("[WARN] Failed to load env_variables.py Stockfish:", e)
+    
+    # 2. Try system-installed Stockfish
     system_path = shutil.which("stockfish")
     if system_path:
         print("[INFO] Using system Stockfish:", system_path)
@@ -53,7 +60,7 @@ def load_stockfish():
         except Exception as e:
             print("[WARN] Failed to load system Stockfish:", e)
 
-    # 2. Fall back to bundled binary inside repo
+    # 3. Fall back to bundled binary inside repo
     root = os.path.dirname(os.path.abspath(__file__))
     local_path = os.path.join(root, "stockfish", "stockfish","stockfish-windows-x86-64-avx2.exe")
 
@@ -64,7 +71,7 @@ def load_stockfish():
         except Exception as e:
             print("[ERROR] Failed to launch bundled Stockfish:", e)
 
-    # 3. If everything failed
+    # 4. If everything failed
     print("[ERROR] No Stockfish available. Minimax-only mode.")
     return None
 

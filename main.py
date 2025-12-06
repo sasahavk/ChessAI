@@ -476,7 +476,8 @@ class ChessGame:
             self.show_center_banner(self.get_result_text())
             pygame.display.flip()
 
-        # Append to CSV (same as you had)
+        # Append to CSV 
+        # Win data
         results_path = Path("results_log.csv")
         write_header = not results_path.exists()
         with results_path.open("a", newline="", encoding="utf-8") as f:
@@ -545,3 +546,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

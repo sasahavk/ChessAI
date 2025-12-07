@@ -1,8 +1,8 @@
 import chess
 import chess.engine
 import numpy as np
-import feature_extractor_pawns_king as kpfe
-import feature_extractor_material as mfe
+import feature_extractor_pawns_king_OLD as kpfe
+import feature_extractor_material_OLD as mfe
 import inspect
 
 
@@ -411,19 +411,3 @@ def write_features_file(input_file='positions_OLD.csv',output_file='positions_wi
 
     print("DONE")
 
-
-write_features_file()
-
-# fens = [
-# "b6b/r6r/q6q/8/8/8/8/8 w KQkq - 0 1",
-# # "rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1",
-# # "rnbqkbnr/pppp1ppp/4p3/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 2",
-# # "rnbqkbnr/pppp1ppp/4p3/8/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 0 2",
-# # "rnbqk1nr/ppppbppp/4p3/8/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 1 3",
-# ]
-#
-# fe = mfe.MaterialFeatureExtractor(chess.Board(), 0)
-# for i in range(len(fens)):
-#     fe.set_board(chess.Board(fens[i]))
-#
-#     print(fe.get_features())

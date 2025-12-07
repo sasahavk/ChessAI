@@ -1,8 +1,8 @@
 import chess
 import chess.engine
 import numpy as np
-import feature_extractor_pawns_king as kpfe
-import feature_extractor_material as mfe
+import ann_group.feature_extractor_pawns_king as kpfe
+import ann_group.feature_extractor_material as mfe
 import inspect
 
 
@@ -197,6 +197,7 @@ feature_weights = {
     "threat_black": 0,
     "threat_white": 0,
 }
+
 
 class FeatureExtractorN:
     def __init__(self, board: chess.Board, game_stage: int):
@@ -826,7 +827,7 @@ def mirror_square(sq: int) -> int:
     return ((7 - (sq // 8)) * 8) + (sq % 8)
 
 
-def write_features_file(input_file='positions.csv',output_file='positions_with_features_NEW.csv',):
+def write_features_file(input_file='ann_group/positions.csv',output_file='ann_group/positions_with_features_NEW.csv',):
     fe = FeatureExtractorN(chess.Board(), 0)
     feature_names = list(feature_weights.keys())
     feature_names.sort()
@@ -861,10 +862,86 @@ def write_features_file(input_file='positions.csv',output_file='positions_with_f
     fe.engine.quit()
 
 
-# write_features_file()
+features_names = [
+    # "attack_balance", #Y
+    "attack_black",
+    "attack_white",
+    # "bishop_outposts_black", # Z
+    # "bishop_outposts_white",
+    "bishop_pair_white", # early
+    "bishop_pair_black",
+    # "bishop_sqr_sum", #Y
+    # "bishop_sqr_sum_black",
+    # "bishop_sqr_sum_white",
+    "center_attackers_white", #Y
+    "center_attackers_black", #Y
+    "connected_pawns", # Y
+    # "connected_pawns_black",
+    # "connected_pawns_white",
+    "defense_balance", # Y
+    # "defense_black",
+    # "defense_white",
+    # "doubled_pawns", # zero
+    "doubled_pawns_black",
+    "doubled_pawns_white",
+    "half_open_king_files", # late
+    # "half_open_king_files_black",
+    # "half_open_king_files_white",
+    # "isolated_pawns", # mide - late
+    "isolated_pawns_black",
+    "isolated_pawns_white",
+    "king_ring_enemy_pressure", # Y
+    # "king_ring_enemy_pressure_black",
+    # "king_ring_enemy_pressure_white",
+    # "king_sqr_sum",
+    # "king_sqr_sum_black", # Y
+    # "king_sqr_sum_white", # Y
+    # "knight_outposts_black", # zero
+    # "knight_outposts_white", # zero
+    # "knight_sqr_sum", # early - mid
+    # "knight_sqr_sum_black",
+    # "knight_sqr_sum_white",
+    "material_bishop_white", # early - mid
+    "material_bishop_black", # early - mid
+    "material_knight_white", # early - mid
+    "material_knight_black", # early - mid
+    "material_pawn_white", # Y
+    "material_pawn_black", # Y
+    "material_queen_white", # early - mid
+    "material_queen_black", # early - mid
+    "material_rook_white", # early - mid
+    "material_rook_black", # early - mid
+    # "mobility_balance", # Y
+    "mobility_black",
+    "mobility_white",
+    # "mobility_safe_balance", # Y
+    "mobility_safe_black",
+    "mobility_safe_white",
+    "outposts_white", # zero
+    "outposts_black", # zero
+    "passed_pawns", # mid - late
+    # "passed_pawns_black",
+    # "passed_pawns_white",
+    "pawn_shield", # Y
+    # "pawn_shield_black",
+    # "pawn_shield_white",
+    # "pawn_sqr_sum", # Y
+    # "pawn_sqr_sum_black",
+    # "pawn_sqr_sum_white",
+    "pieces_occupying_center", # Y
+    # "queen_sqr_sum", # zero
+    # "queen_sqr_sum_black",
+    # "queen_sqr_sum_white",
+    # "rook_sqr_sum", # zero
+    # "rook_sqr_sum_black",
+    # "rook_sqr_sum_white",
+    "sqr_sum_black",
+    "sqr_sum_white",
+    # "threat_balance",
+    "threat_black", # Y
+    "threat_white" # Y
+]
 
 # fe = FeatureExtractorN(chess.Board("rnbqkbnr/ppp2ppp/4p3/3p4/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3"), EARLY_GAME)
-# print(fe.ft_target())
-# print(fe.get_features())
-# print(len(fe.get_features()))
+# print(fe.get_features_subset_dict(features_names))
 # fe.engine.quit()

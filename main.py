@@ -12,7 +12,7 @@ from minimax_group.evaluate import evaluate
 from minimax_group.minimax_new import FastMinimaxBot
 import env_variables as env
 from chess.engine import SimpleEngine, Info
-from ann_group.ann_eval import model_path, scaler_x_path, scaler_y_path, trained_features_path, ann
+from ann_group.ann_eval import ann
 from ann_group.feature_extractor import FeatureExtractorN
 
 TILE = 50
@@ -111,7 +111,7 @@ class ChessGame:
         self.minimax_new_time_total = 0.0
         self.minimax_new_moves = 0
 
-        self.ann = ann(model_path, scaler_x_path, scaler_y_path, trained_features_path)
+        self.ann = ann()
         self.ann_minimax = MinimaxBot(depth=ann_minimax_depth, eval_fn=self.ann.eval)
 
         self.move_log: list[dict] = []
@@ -748,8 +748,6 @@ class ChessGame:
             winner = "black" if self.board.turn == chess.WHITE else "white"
         else:
             winner = "draw"
-
-        return
 
         # Termination type
         if outcome and outcome.termination:

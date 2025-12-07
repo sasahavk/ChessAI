@@ -10,14 +10,14 @@ from minimax_group import minimax_bot
 
 warnings.filterwarnings("ignore",  message="X does not have valid feature names")
 
-model_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/ann_model2.keras'
-scaler_x_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/scaler_features2.joblib'
-scaler_y_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/scaler_target2.joblib'
-trained_features_path ='C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/trained_feature_list2.joblib'
+# model_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/ann_model2.keras'
+# scaler_x_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/scaler_features2.joblib'
+# scaler_y_path = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/scaler_target2.joblib'
+# trained_features_path ='C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/trained_feature_list2.joblib'
 
 
 class ann:
-    def __init__(self, model_path, scaler_x_path, scaler_y_path, trained_features_path):
+    def __init__(self, model_path='ann_group/ann_model2.keras', scaler_x_path="ann_group/scaler_features2.joblib", scaler_y_path='ann_group/scaler_target2.joblib', trained_features_path='ann_group/trained_feature_list2.joblib'):
         self.model = load_model(model_path)
         self.scaler_x = joblib.load(scaler_x_path)
         self.scaler_y = joblib.load(scaler_y_path)
@@ -28,8 +28,12 @@ class ann:
         self.df_input = pd.DataFrame()
 
     def eval(self, board: chess.Board) -> float:
-
         self.fe.set_board(board)
+        if self.fe.board.is_checkmate():
+            if self.fe.board.turn == chess.WHITE:
+                return 99.9
+            else:
+                return -99.9
         self.features_dict = self.fe.get_features_subset_dict(self.features)
         X = np.array([self.features_dict.get(f, 0) for f in self.features], dtype=np.float32).reshape(1, -1)
 

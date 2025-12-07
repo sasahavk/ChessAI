@@ -26,8 +26,16 @@ class ann:
         self.features_dict = {}
         self.model_features_dict = {}
         self.df_input = pd.DataFrame()
+        self.cache = {}
+
+    def clear_cache(self):
+        self.cache.clear()
 
     def eval(self, board: chess.Board) -> float:
+        key = board.fen()
+        if key in self.cache:
+            return self.cache[key]
+
         self.fe.set_board(board)
         if self.fe.board.is_checkmate():
             if self.fe.board.turn == chess.WHITE:
@@ -41,6 +49,7 @@ class ann:
         y_pred_scaled = self.model(X_scaled, training=False)
         y_pred = self.scaler_y.inverse_transform(y_pred_scaled.numpy())[0]
 
+        self.cache[key] = float(y_pred.item())
         return float(y_pred.item())
 
 

@@ -6,6 +6,7 @@ from keras.saving import load_model
 import time
 import warnings
 import feature_extractor
+from ann_group.ann import y_pred
 from feature_extractor import FeatureExtractorN
 from minimax_group import minimax_bot
 
@@ -27,9 +28,15 @@ class ann:
         self.features_dict = {}
         self.model_features_dict = {}
         self.df_input = pd.DataFrame()
+        self.cache = {}
+
+    def clear_cache(self):
+        self.cache.clear()
 
     def eval(self, board: chess.Board) -> float:
-
+        key = board.fen()
+        if key in self.cache:
+            return self.cache[key]
         self.fe.set_board(board)
         self.features_dict = self.fe.get_features_subset_dict(self.features)
         X = np.array([self.features_dict.get(f, 0) for f in self.features], dtype=np.float32).reshape(1, -1)
@@ -38,6 +45,7 @@ class ann:
         y_pred_scaled = self.model(X_scaled, training=False)
         y_pred = self.scaler_y.inverse_transform(y_pred_scaled.numpy())[0]
 
+        self.cache[key] = float(y_pred.item())
         return float(y_pred.item())
 
 

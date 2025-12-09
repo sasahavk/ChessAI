@@ -46,17 +46,19 @@ def performMove(board, bot, moveID=-1):
         board.push(result.move)
     else:
         board.push(result)
-    print(board, "\n")
+    # print(board, "\n")
 
     timeEnd = time.time()
     timeTaken = timeEnd - timeStart
 
-    print(f"Time taken for move {moveID}:  {timeTaken} seconds")
-    print("===================")
+    # print(f"Time taken for move {moveID}:  {timeTaken} seconds")
+    # print("===================")
 
     return stats
 
 def run_matches(bot1, bot2, numMatches=5, fileName="results"):
+    print(f"generating results in ./results/{fileName}.csv")
+
     with open(f"./results/{fileName}.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["game", "winner", "moves", "time(sec)",
@@ -74,12 +76,12 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
             elif result == "0-1":  result = "black"
             elif result == "1/2-1/2":  result = "tie"
 
-            if bot1Stats != None:
-                print("bot1:")
-                print(bot1Stats)
-            if bot2Stats != None:
-                print("bot2:")
-                print(bot2Stats)
+            # if bot1Stats != None:
+            #     print("bot1:")
+            #     print(bot1Stats)
+            # if bot2Stats != None:
+            #     print("bot2:")
+            #     print(bot2Stats)
 
             stats = bot1Stats if bot1Stats != None else bot2Stats
             if bot1Stats and bot2Stats:
@@ -89,6 +91,9 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
                 stats["avgSimDepth"] = (bot1Stats["avgSimDepth"] + bot2Stats["avgSimDepth"]) / 2.0
                 stats["numRootSims"] = (bot1Stats["numRootSims"] + bot2Stats["numRootSims"]) / 2.0
                 stats["foundWinningMoveSets"] = (bot1Stats["foundWinningMoveSets"] + bot2Stats["foundWinningMoveSets"]) / 2.0
+            
+            if stats["boardEvalScore"] == None:
+                stats["boardEvalScore"] = "none"
 
             print(f"Game {i+1} finished - winner={result}, moves={numMoves}, time={totalTime:.1f}s, ")
             print(f"\tavg sim depth: {stats["avgSimDepth"]}, num root sims: {stats["numRootSims"]}, ")

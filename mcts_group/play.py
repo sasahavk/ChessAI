@@ -9,7 +9,7 @@ MAX_DEPTH:int = 150
 MAX_MOVES:int = 300
 
 STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
-STOCKFISH_ELO_DEFAULT = 1500
+STOCKFISH_ELO_DEFAULT = 2000
 STOCKFISH_ELO_MIN = 1320
 STOCKFISH_PATH = r"/home/thielith/Desktop/school/ECS_170/project/stockfish_bmi2/stockfish-ubuntu-x86-64-bmi2"
 
@@ -73,7 +73,6 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
             if result == "1-0":  result = "white"
             elif result == "0-1":  result = "black"
             elif result == "1/2-1/2":  result = "tie"
-            else:  result == None
 
             if bot1Stats != None:
                 print("bot1:")
@@ -84,12 +83,12 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
 
             stats = bot1Stats if bot1Stats != None else bot2Stats
             if bot1Stats and bot2Stats:
-                stats = {
-                    "avgSimDepth": (bot1Stats["avgSimDepth"] + bot2Stats["avgSimDepth"]) / 2.0,
-                    "numRootSims": (bot1Stats["numRootSims"] + bot2Stats["numRootSims"]) / 2.0,
-                    "boardEvalScore": (bot1Stats["boardEvalScore"] + bot2Stats["boardEvalScore"]) / 2.0,
-                    "foundWinningMoveSets": (bot1Stats["foundWinningMoveSets"] + bot2Stats["foundWinningMoveSets"]) / 2.0
-                }
+                if bot1Stats["boardEvalScore"] != None and bot2Stats["boardEvalScore"] != None:
+                    stats["boardEvaleScore"] = (bot1Stats["boardEvalScore"] + bot2Stats["boardEvalScore"]) / 2.0
+                
+                stats["avgSimDepth"] = (bot1Stats["avgSimDepth"] + bot2Stats["avgSimDepth"]) / 2.0
+                stats["numRootSims"] = (bot1Stats["numRootSims"] + bot2Stats["numRootSims"]) / 2.0
+                stats["foundWinningMoveSets"] = (bot1Stats["foundWinningMoveSets"] + bot2Stats["foundWinningMoveSets"]) / 2.0
 
             print(f"Game {i+1} finished - winner={result}, moves={numMoves}, time={totalTime:.1f}s, ")
             print(f"\tavg sim depth: {stats["avgSimDepth"]}, num root sims: {stats["numRootSims"]}, ")
@@ -98,8 +97,6 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
             writer.writerow([i+1, result, numMoves, f"{totalTime:.1f}",
                 stats["avgSimDepth"], stats["numRootSims"], stats["boardEvalScore"], stats["foundWinningMoveSets"]
             ])
-        
-        stockfish.quit()
 
 def runSeveralConfigdMatches(numPerBatch:int, botOpponent=None, botName:str=""):
     mctsBotDefault = MonteCarloSearchTreeBot(
@@ -214,6 +211,8 @@ if __name__ == "__main__":
     runSeveralConfigdMatches(10, botOpponent=stockfish, botName=f"stockfish-{STOCKFISH_ELO_DEFAULT}")
     stockfish.configure({"UCI_Elo": STOCKFISH_ELO_MIN})
     runSeveralConfigdMatches(10, botOpponent=stockfish, botName=f"stockfish-{STOCKFISH_ELO_MIN}")
+
+    stockfish.quit()
 
 
 

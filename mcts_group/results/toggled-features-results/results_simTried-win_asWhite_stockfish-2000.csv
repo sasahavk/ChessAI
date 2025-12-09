@@ -1,0 +1,11 @@
+game,winner,moves,time(sec),avgSimDepth,numRootSim,avgBoardEvalScore,numFoundWinningMoveSets
+1,black,62,6.7,113.5,33,none,33
+2,black,42,5.2,135.7,19,none,19
+3,black,46,7.3,97.14285714285714,20,none,20
+4,black,44,5.1,135.39705882352942,67,none,67
+5,black,34,4.0,138.92307692307693,25,none,25
+6,black,80,15.2,115.35,79,none,79
+7,black,40,5.4,136.0,67,none,67
+8,black,20,1.6,135.0,9,none,9
+9,black,66,7.9,100.24096385542168,82,none,82
+10,black,20,2.3,105.88235294117646,16,none,16

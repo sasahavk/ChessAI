@@ -153,6 +153,7 @@ class ChessGame:
             self.engine.quit()
         if self.engine_analyze:
             self.engine_analyze.quit()
+        self.ann.fe.engine.quit()
 
     def draw_board(self):
         for r in range(8):
@@ -927,8 +928,8 @@ def main():
     # Choose players per side: "human", "minimax", "mcts", "ann_minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
     game = ChessGame(white_player="human", black_player="stockfish", minimax_depth=5)
-    # game.play(render=True)
-    run_batch("minimax", "stockfish", num_games=10)
+    game.play(render=True)
+    # run_batch("minimax", "stockfish", num_games=10)
 
 if __name__ == "__main__":
     main()

@@ -17,12 +17,12 @@ warnings.filterwarnings("ignore",  message="X does not have valid feature names"
 
 
 class ann:
-    def __init__(self, model_path='ann_group/ann_model2.keras', scaler_x_path="ann_group/scaler_features2.joblib", scaler_y_path='ann_group/scaler_target2.joblib', trained_features_path='ann_group/trained_feature_list2.joblib'):
+    def __init__(self, stockfish_path, model_path='ann_group/ann_model2.keras', scaler_x_path="ann_group/scaler_features2.joblib", scaler_y_path='ann_group/scaler_target2.joblib', trained_features_path='ann_group/trained_feature_list2.joblib'):
         self.model = load_model(model_path)
         self.scaler_x = joblib.load(scaler_x_path)
         self.scaler_y = joblib.load(scaler_y_path)
         self.features = joblib.load(trained_features_path)
-        self.fe = ann_fe.FeatureExtractorN(chess.Board(), ann_fe.EARLY_GAME)
+        self.fe = ann_fe.FeatureExtractorN(chess.Board(), ann_fe.EARLY_GAME, stockfish_path=stockfish_path)
         self.features_dict = {}
         self.model_features_dict = {}
         self.df_input = pd.DataFrame()

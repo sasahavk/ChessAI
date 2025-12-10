@@ -73,11 +73,12 @@ class MonteCarloSearchTreeBot:
 			# Backpropagation
 			self.backpropagate(leaf, result)
 
-			if self.goForWin and result >= VAL_WIN: 
-				# print("YOU HAVE A WINNING SET OF MOVES!  TAKE IT!")
-				break
-			else:
-				statNumPossibleWinningMoveSet += 1
+			if result >= VAL_WIN:
+				if self.goForWin: 
+					# print("YOU HAVE A WINNING SET OF MOVES!  TAKE IT!")
+					break
+				else:
+					statNumPossibleWinningMoveSet += 1
 
 		if not root.children:
 			return random.choice(list(board.legal_moves))
@@ -86,7 +87,7 @@ class MonteCarloSearchTreeBot:
 		stats = {
 			"avgSimDepth": averageSimDepth,
 			"numRootSims": i,
-			"boardEvalScore": None,
+			"boardEvalScore": 0,
 			"foundWinningMoveSets": statNumPossibleWinningMoveSet
 		}
 		

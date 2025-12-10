@@ -51,6 +51,9 @@ def performMove(board, bot, moveID=-1):
     timeEnd = time.time()
     timeTaken = timeEnd - timeStart
 
+    if stats != None:
+        stats["timePerMove"] = timeTaken
+
     # print(f"Time taken for move {moveID}:  {timeTaken} seconds")
     # print("===================")
 
@@ -61,9 +64,17 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
 
     with open(f"./results/{fileName}.csv", "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["game", "winner", "moves", "time(sec)",
+        writer.writerow(["game", "winner", "moves", "time(sec)", "timePerMove",
             "avgSimDepth", "numRootSim", "avgBoardEvalScore", "numFoundWinningMoveSets"
         ])
+
+        numMovesFromAll = []
+        gameTimes = []
+        moveTimes = []
+        simDepths = []
+        rootSims = []
+        boardEvals = []
+        numWinMoveSets = []
 
         for i in range(numMatches):
             print(f"\n========== Game {i+1} ==========")
@@ -91,17 +102,37 @@ def run_matches(bot1, bot2, numMatches=5, fileName="results"):
                 stats["avgSimDepth"] = (bot1Stats["avgSimDepth"] + bot2Stats["avgSimDepth"]) / 2.0
                 stats["numRootSims"] = (bot1Stats["numRootSims"] + bot2Stats["numRootSims"]) / 2.0
                 stats["foundWinningMoveSets"] = (bot1Stats["foundWinningMoveSets"] + bot2Stats["foundWinningMoveSets"]) / 2.0
-            
-            if stats["boardEvalScore"] == None:
-                stats["boardEvalScore"] = "none"
+                stats["timePerMove"] = (bot1Stats["timePerMove"] + bot2Stats["timePerMove"]) / 2.0
 
-            print(f"Game {i+1} finished - winner={result}, moves={numMoves}, time={totalTime:.1f}s, ")
+            print(f"Game {i+1} finished - winner={result}, moves={numMoves}, time={totalTime:.1f}s, avg move time={stats["timePerMove"]:.1f}")
             print(f"\tavg sim depth: {stats["avgSimDepth"]}, num root sims: {stats["numRootSims"]}, ")
             print(f"\tavg non-end eval score: {stats["boardEvalScore"]}, num found winning movesets: {stats["foundWinningMoveSets"]}")
 
-            writer.writerow([i+1, result, numMoves, f"{totalTime:.1f}",
+            writer.writerow([i+1, result, numMoves, f"{totalTime:.1f}", stats["timePerMove"],
                 stats["avgSimDepth"], stats["numRootSims"], stats["boardEvalScore"], stats["foundWinningMoveSets"]
             ])
+
+            numMovesFromAll.append(numMoves)
+            gameTimes.append(totalTime)
+            moveTimes.append(stats["timePerMove"])
+            simDepths.append(stats["avgSimDepth"])
+            rootSims.append(stats["numRootSims"])
+            boardEvals.append(stats["boardEvalScore"])
+            numWinMoveSets.append(stats["foundWinningMoveSets"])
+        
+        # average all entries
+        avgNumMoves = sum(numMovesFromAll) / len(numMovesFromAll)
+        avgGameTimes = sum(gameTimes) / len(gameTimes)
+        avgMoveTimes = sum(moveTimes) / len(moveTimes)
+        avgSimDepths = sum(simDepths) / len(simDepths)
+        avgRootSims = sum(rootSims) / len(rootSims)
+        avgBoardEvals = sum(boardEvals) / len(boardEvals)
+        avgNumWinMoveSets = sum(numWinMoveSets) / len(numWinMoveSets)
+
+        writer.writerow(["avg", "-", avgNumMoves, f"{avgGameTimes:.1f}", avgMoveTimes,
+            avgSimDepths, avgRootSims, avgBoardEvals, avgNumWinMoveSets
+        ])
+
 
 def runSeveralConfigdMatches(numPerBatch:int, botOpponent=None, botName:str=""):
     mctsBotDefault = MonteCarloSearchTreeBot(
@@ -136,33 +167,6 @@ def runSeveralConfigdMatches(numPerBatch:int, botOpponent=None, botName:str=""):
         conditionForSimulatingTriedMoves=lambda n: False,
         goForWin=True
     )
-
-    mctsBotRemember_SimTriedMoves = MonteCarloSearchTreeBot(
-        numRootSimulations=MCTS_ITERS,
-        maxSimDepth=MAX_DEPTH,
-        evalFunc=evaluate,
-        rememberPastBoardScores=True,
-        conditionForSimulatingTriedMoves=None,
-        goForWin=False
-    )
-    mctsBotRemember_JumpTheWinGun = MonteCarloSearchTreeBot(
-        numRootSimulations=MCTS_ITERS,
-        maxSimDepth=MAX_DEPTH,
-        evalFunc=evaluate,
-        rememberPastBoardScores=True,
-        conditionForSimulatingTriedMoves=lambda n: False,
-        goForWin=True
-    )
-
-    mctsBotSimTried_JumpWin = MonteCarloSearchTreeBot(
-        numRootSimulations=MCTS_ITERS,
-        maxSimDepth=MAX_DEPTH,
-        evalFunc=evaluate,
-        rememberPastBoardScores=False,
-        conditionForSimulatingTriedMoves=None,
-        goForWin=True
-    )
-
     mctsBotAllThree = MonteCarloSearchTreeBot(
         numRootSimulations=MCTS_ITERS,
         maxSimDepth=MAX_DEPTH,
@@ -174,15 +178,55 @@ def runSeveralConfigdMatches(numPerBatch:int, botOpponent=None, botName:str=""):
 
     # against self
     if botOpponent == None:
-        run_matches(bot1=mctsBotDefault, bot2=mctsBotDefault, numMatches=numPerBatch, fileName="results_default_self")
-        run_matches(bot1=mctsBotRemember, bot2=mctsBotRemember, numMatches=numPerBatch, fileName="results_remember_self")
-        run_matches(bot1=mctsBotSimTriedMoves, bot2=mctsBotSimTriedMoves, numMatches=numPerBatch, fileName="results_lookAtTriedMoves_self")
-        run_matches(bot1=mctsBotJumpTheWinGun, bot2=mctsBotJumpTheWinGun, numMatches=numPerBatch, fileName="results_jumpTheWinGun_self")
+        mctsBotDefault2 = MonteCarloSearchTreeBot(
+            numRootSimulations=MCTS_ITERS,
+            maxSimDepth=MAX_DEPTH,
+            evalFunc=evaluate,
+            rememberPastBoardScores=False,
+            conditionForSimulatingTriedMoves=lambda n: False,
+            goForWin=False
+        )
+        run_matches(bot1=mctsBotDefault, bot2=mctsBotDefault2, numMatches=numPerBatch, fileName="results_default_self")
 
-        run_matches(bot1=mctsBotRemember_SimTriedMoves, bot2=mctsBotRemember_SimTriedMoves, numMatches=numPerBatch, fileName="results_remember-simTried_self")
-        run_matches(bot1=mctsBotRemember_JumpTheWinGun, bot2=mctsBotRemember_JumpTheWinGun, numMatches=numPerBatch, fileName="results_remember-win_self")
-        run_matches(bot1=mctsBotSimTried_JumpWin, bot2=mctsBotSimTried_JumpWin, numMatches=numPerBatch, fileName="results_simTried-win_self")
-        run_matches(bot1=mctsBotAllThree, bot2=mctsBotAllThree, numMatches=numPerBatch, fileName="results_allThree_self")
+        mctsBotRemember2 = MonteCarloSearchTreeBot(
+            numRootSimulations=MCTS_ITERS,
+            maxSimDepth=MAX_DEPTH,
+            evalFunc=evaluate,
+            rememberPastBoardScores=True,
+            conditionForSimulatingTriedMoves=lambda n: False,
+            goForWin=False
+        )
+        run_matches(bot1=mctsBotRemember, bot2=mctsBotRemember2, numMatches=numPerBatch, fileName="results_remember_self")
+
+        mctsBotSimTriedMoves2 = MonteCarloSearchTreeBot(
+            numRootSimulations=MCTS_ITERS,
+            maxSimDepth=MAX_DEPTH,
+            evalFunc=evaluate,
+            rememberPastBoardScores=False,
+            conditionForSimulatingTriedMoves=None,
+            goForWin=False
+        )
+        run_matches(bot1=mctsBotSimTriedMoves, bot2=mctsBotSimTriedMoves2, numMatches=numPerBatch, fileName="results_lookAtTriedMoves_self")
+        
+        mctsBotJumpTheWinGun2 = MonteCarloSearchTreeBot(
+            numRootSimulations=MCTS_ITERS,
+            maxSimDepth=MAX_DEPTH,
+            evalFunc=evaluate,
+            rememberPastBoardScores=False,
+            conditionForSimulatingTriedMoves=lambda n: False,
+            goForWin=True
+        )
+        run_matches(bot1=mctsBotJumpTheWinGun, bot2=mctsBotJumpTheWinGun2, numMatches=numPerBatch, fileName="results_jumpTheWinGun_self")
+
+        mctsBotAllThree2 = MonteCarloSearchTreeBot(
+            numRootSimulations=MCTS_ITERS,
+            maxSimDepth=MAX_DEPTH,
+            evalFunc=evaluate,
+            rememberPastBoardScores=True,
+            conditionForSimulatingTriedMoves=None,
+            goForWin=True
+        )
+        run_matches(bot1=mctsBotAllThree, bot2=mctsBotAllThree2, numMatches=numPerBatch, fileName="results_allThree_self")
         return
 
     # against bot, is white
@@ -190,10 +234,6 @@ def runSeveralConfigdMatches(numPerBatch:int, botOpponent=None, botName:str=""):
     run_matches(bot1=mctsBotRemember, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_remember_asWhite_{botName}")
     run_matches(bot1=mctsBotSimTriedMoves, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_lookAtTriedMoves_asWhite_{botName}")
     run_matches(bot1=mctsBotJumpTheWinGun, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_jumpTheWinGun_asWhite_{botName}")
-
-    run_matches(bot1=mctsBotRemember_SimTriedMoves, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_remember-simTried_asWhite_{botName}")
-    run_matches(bot1=mctsBotRemember_JumpTheWinGun, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_remember-win_asWhite_{botName}")
-    run_matches(bot1=mctsBotSimTried_JumpWin, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_simTried-win_asWhite_{botName}")
     run_matches(bot1=mctsBotAllThree, bot2=botOpponent, numMatches=numPerBatch, fileName=f"results_allThree_asWhite_{botName}")
 
     # against bot, is black
@@ -201,12 +241,7 @@ def runSeveralConfigdMatches(numPerBatch:int, botOpponent=None, botName:str=""):
     run_matches(bot2=mctsBotRemember, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_remember_asBlack_{botName}")
     run_matches(bot2=mctsBotSimTriedMoves, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_lookAtTriedMoves_asBlack_{botName}")
     run_matches(bot2=mctsBotJumpTheWinGun, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_jumpTheWinGun_asBlack_{botName}")
-
-    run_matches(bot2=mctsBotRemember_SimTriedMoves, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_remember-simTried_asBlack_{botName}")
-    run_matches(bot2=mctsBotRemember_JumpTheWinGun, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_remember-win_asBlack_{botName}")
-    run_matches(bot2=mctsBotSimTried_JumpWin, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_simTried-win_asBlack_{botName}")
     run_matches(bot2=mctsBotAllThree, bot1=botOpponent, numMatches=numPerBatch, fileName=f"results_allThree_asBlack_{botName}")
-    
 
 
 if __name__ == "__main__":

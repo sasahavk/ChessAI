@@ -37,13 +37,14 @@ class Node:
 	
 
 class MonteCarloSearchTreeBot:
-	def __init__(self, numRootSimulations:int, maxSimDepth:int, evalFunc=None, rememberPastBoardScores:bool=True, conditionForSimulatingTriedMoves=None):
+	def __init__(self, numRootSimulations:int, maxSimDepth:int, evalFunc=None, rememberPastBoardScores:bool=False, conditionForSimulatingTriedMoves=None, goForWin=False):
 		self.numRootSimulations	:int = numRootSimulations	
 		self.maxSimDepth:int = maxSimDepth
 		self.evalFunc = backupEvalFunc if (evalFunc == None) else evalFunc
 		self.color:bool = None
 		self.rememberPastBoardScores:bool = rememberPastBoardScores
 		self.boardScores:dict = {}
+		self.goForWin:bool = goForWin
 		self.conditionForSimulatingTriedMoves = defaultRuleForLookingAtTriedMoves \
 			if (conditionForSimulatingTriedMoves == None) else conditionForSimulatingTriedMoves
 
@@ -51,24 +52,50 @@ class MonteCarloSearchTreeBot:
 		self.color = board.turn
 		root:Node = Node(board)
 
+		statSimDepthsReached:list[int] = []
+		statNumPossibleWinningMoveSet:int = 0
+
+		i:int = 0
 		for i in range(self.numRootSimulations):
 			# Selection + Expansion
 			leaf:Node = self.applyTreePolicy(root, self.conditionForSimulatingTriedMoves(i))
 
 			# Simulation
-			result:int = self.rollout(leaf) if not (board.fen() in self.boardScores) else self.boardScores[board.fen()]
+			result = None
+			depth:int = None
+			if self.rememberPastBoardScores and board.fen() in self.boardScores:
+				result = self.boardScores[board.fen()]
+				depth = 0
+			else:
+				result, depth = self.rollout(leaf)
+			statSimDepthsReached.append(depth)
 
 			# Backpropagation
 			self.backpropagate(leaf, result)
 
-			# if result >= VAL_WIN:
-			# 	# print("YOU HAVE A WINNING SET OF MOVES!  TAKE IT!")
-			# 	break
+			if result >= VAL_WIN:
+				if self.goForWin: 
+					# print("YOU HAVE A WINNING SET OF MOVES!  TAKE IT!")
+					break
+				else:
+					statNumPossibleWinningMoveSet += 1
 
 		if not root.children:
 			return random.choice(list(board.legal_moves))
 		
-		return max(root.children, key=lambda n: n.score / n.visits).lastMove
+		averageSimDepth:float = sum(statSimDepthsReached) / len(statSimDepthsReached)
+		stats = {
+			"avgSimDepth": averageSimDepth,
+			"numRootSims": i,
+			"boardEvalScore": 0,
+			"foundWinningMoveSets": statNumPossibleWinningMoveSet
+		}
+		
+		bestChild = max(root.children, key=lambda n: n.score / n.visits)
+		if bestChild.score < VAL_WIN and bestChild.score > VAL_LOSE:  # i.e didnt find an end state
+			stats["boardEvalScore"] = bestChild.score
+				
+		return bestChild.lastMove, stats
 	
 	def applyTreePolicy(self, node:Node, skipUntriedMoves:bool = False) -> Node:
 		currentNode:Node = node
@@ -80,28 +107,32 @@ class MonteCarloSearchTreeBot:
 			currentNode:Node = currentNode.best_child()
 		return currentNode
 	
-	def rollout(self, node:Node) -> int:
+	def rollout(self, node:Node) -> (int, int):
 		simBoard:chess.Board = node.board.copy()
 
 		# "play" random moves until game over or simulation depth reached
-		for _ in range(self.maxSimDepth):
+		# make sure that if the loop breaks, it is our turn
+		d:int = 0
+		while d < self.maxSimDepth or simBoard.turn != self.color:
+		# for d in range(self.maxSimDepth):
 			if simBoard.is_game_over():
 				result = simBoard.result()
 				if result == "1-0":
-					return VAL_WIN if (self.color == chess.WHITE) else VAL_LOSE
+					return (VAL_WIN if (self.color == chess.WHITE) else VAL_LOSE), d
 				elif result == "0-1":
-					return VAL_LOSE if (self.color == chess.WHITE) else VAL_WIN
+					return (VAL_LOSE if (self.color == chess.WHITE) else VAL_WIN), d
 				else:
-					return VAL_TIE
+					return VAL_TIE, d
 			
 			currentLegalMoves:list[chess.Move] = list(simBoard.legal_moves)
 			if not currentLegalMoves:
 				break
 			simBoard.push(random.choice(currentLegalMoves))
+			d += 1
 
 		# if max simulation depth reached, return board score based on evaluation
-		boardScore:int = self.evalFunc(simBoard)
-		return boardScore if (self.color == chess.WHITE) else -boardScore
+		boardScore:int = self.evalFunc(simBoard)  # score is from white's perspective
+		return (boardScore if (self.color == chess.WHITE) else -boardScore), d
 	
 	def backpropagate(self, node:Node, score:int) -> None:
 		currentNode:Node = node
@@ -110,7 +141,7 @@ class MonteCarloSearchTreeBot:
 			currentNode.visits += 1
 			currentNode.score = score
 			
-			if self.rememberPastBoardScores:
+			if self.rememberPastBoardScores and currentNode.parent != None:
 				self.boardScores.update({currentNode.board.fen(): score})
 			
 			currentNode = currentNode.parent
@@ -129,7 +160,7 @@ def backupEvalFunc(board:chess.Board) -> int:
 			len(board.pieces(piece, chess.WHITE))
 			- len(board.pieces(piece, chess.BLACK))
 		)
-    return score if board.turn else -score
+    return score
 
 def defaultRuleForLookingAtTriedMoves(totalRootSimulations:int) -> bool:
 	# out of 10 root simulations

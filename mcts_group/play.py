@@ -11,7 +11,7 @@ MAX_MOVES:int = 300
 STOCKFISH_LIMIT = chess.engine.Limit(time=0.1)  # or depth=12, nodes=...
 STOCKFISH_ELO_DEFAULT = 2000
 STOCKFISH_ELO_MIN = 1320
-STOCKFISH_PATH = r"/home/thielith/Desktop/school/ECS_170/project/stockfish_bmi2/stockfish-ubuntu-x86-64-bmi2"
+STOCKFISH_PATH = r""
 
 stockfish = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
 stockfish.configure({"UCI_LimitStrength": True})

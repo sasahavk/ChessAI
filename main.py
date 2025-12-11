@@ -79,8 +79,8 @@ def load_stockfish(path_to_stockfish:str = None):
         print("[WARN] Failed to load env_variables.py Stockfish:", e) 
 
     # 4. If everything failed
-    print("[ERROR] No Stockfish available. Minimax-only mode.")
-    return None
+    print("[ERROR] No Stockfish available. Please either install stockfish or provide a path to its executable in env_variables.py.")
+    exit()
 
 
 
@@ -120,6 +120,10 @@ class ChessGame:
         self.engine_analyze = None
         if self.white_player == "stockfish" or self.black_player == "stockfish":
             self.engine_analyze, self.stockfish_path = load_stockfish(self.stockfish_path)
+        
+        if self.stockfish_path == None:
+            print("[ERROR] No Stockfish available. Please either install stockfish or provide a path to its executable in env_variables.py.")
+            exit()
 
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
         # self.minimax_new = FastMinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
@@ -942,6 +946,14 @@ parser.add_argument("black_player", help="The player who controls the black ches
 def main():
     print("\n----------------") # separator in casee of other console output stuff
     args = parser.parse_args()
+
+    validPlayers:list[str] = ["human", "minimax", "mcts", "ann_minimax", "stockfish"]
+    if args.white_player not in validPlayers:
+        print(f"[ERROR] Valid player not selected for white.  Got {args.white_player}")
+        exit()
+    if args.black_player not in validPlayers:
+        print(f"[ERROR] Valid player not selected for black.  Got {args.black_player}")
+        exit()
 
     # Choose players per side: "human", "minimax", "mcts", "ann_minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)

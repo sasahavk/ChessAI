@@ -106,9 +106,9 @@ class ChessGame:
         self.board = chess.Board()
         
         self.engine = None
-        self.stockfish_path = None
+        _, self.stockfish_path = load_stockfish() 
         if self.white_player == "stockfish" or self.black_player == "stockfish":
-            self.engine, self.stockfish_path = load_stockfish(self.stockfish_path)
+            self.engine, _ = load_stockfish(self.stockfish_path)
 
         if self.engine:
             try:

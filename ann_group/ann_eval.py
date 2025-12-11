@@ -17,10 +17,10 @@ warnings.filterwarnings("ignore",  message="X does not have valid feature names"
 
 
 class ann:
-    def __init__(self, model_path='ann_group/ann_model2.keras', scaler_x_path="ann_group/scaler_features2.joblib", scaler_y_path='ann_group/scaler_target2.joblib', trained_features_path='ann_group/trained_feature_list2.joblib'):
+    def __init__(self, model_path='ann_model3.keras', scaler_x_path="scaler_features3.joblib", trained_features_path='trained_feature_list3.joblib'):
         self.model = load_model(model_path)
         self.scaler_x = joblib.load(scaler_x_path)
-        self.scaler_y = joblib.load(scaler_y_path)
+        # self.scaler_y = joblib.load(scaler_y_path)
         self.features = joblib.load(trained_features_path)
         self.fe = ann_fe.FeatureExtractorN(chess.Board(), ann_fe.EARLY_GAME)
         self.features_dict = {}
@@ -46,16 +46,16 @@ class ann:
         X = np.array([self.features_dict.get(f, 0) for f in self.features], dtype=np.float32).reshape(1, -1)
 
         X_scaled = self.scaler_x.transform(X)
-        y_pred_scaled = self.model(X_scaled, training=False)
-        y_pred = self.scaler_y.inverse_transform(y_pred_scaled.numpy())[0]
+        y_pred_raw = self.model(X_scaled, training=False)
+        y_pred = y_pred_raw.numpy()[0]
 
         self.cache[key] = float(y_pred.item())
         return float(y_pred.item())
 
 
-# sann = ann(model_path, scaler_x_path, scaler_y_path, trained_features_path)
+# sann = ann()
 # print(sann.eval(chess.Board("1r2kb1r/p1q2ppp/2p1p3/1bNpPn2/3P2P1/1P3N2/P4P1P/1RBQR1K1 b k - 0 16")))
-
+#
 # for i in range(1,5):
 #     bot = minimax_bot.MinimaxBot(depth=i, eval_fn=sann.eval)
 #     start = time.perf_counter()
@@ -101,8 +101,8 @@ def benchmark_ann(ann_obj, num_positions=10_0):
 
     return avg_time_ms
 
-# sann = ann(model_path, scaler_x_path, scaler_y_path, trained_features_path)
-# print(benchmark_ann(sann))
+sann = ann()
+print(benchmark_ann(sann))
 
 # Total time for 100 positions: 9.757 seconds
 # Average time per position:          97.5678 ms
@@ -131,5 +131,11 @@ def benchmark_ann(ann_obj, num_positions=10_0):
 # Total time for 100 positions: 1.118 seconds
 # Average time per position:          11.1816 ms
 # Predictions per second:            89.4
+# Model:                             ann
+# Features:                          37
+
+# Total time for 100 positions: 0.438 seconds
+# Average time per position:          4.3839 ms
+# Predictions per second:            228.1
 # Model:                             ann
 # Features:                          37

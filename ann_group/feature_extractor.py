@@ -4,7 +4,7 @@ import numpy as np
 import ann_group.feature_extractor_pawns_king as kpfe
 import ann_group.feature_extractor_material as mfe
 import inspect
-
+import time
 
 PIECE_SQR_TABLES = {
 chess.PAWN :[
@@ -504,9 +504,7 @@ class FeatureExtractorN:
         if self.board.turn == chess.BLACK:
             return self.material_balance_black[4]
         return -self.material_balance_black[4]
-        # if self.board.turn == chess.BLACK:
-        #     return self.material_extractor.material_balance(chess.BLACK)[4]
-        # return -self.material_extractor.material_balance(chess.BLACK)[4]
+
 
     def ft_material_rook_white(self):
         if self.board.turn == chess.WHITE:
@@ -735,12 +733,14 @@ class FeatureExtractorN:
     def passed_pawns(self):
         white_pawns = self.board.pieces(chess.PAWN, chess.WHITE)
         white_passed_pawns = 0
+
         for p in white_pawns:
             if self.is_passed_pawn(p, chess.WHITE):
                 white_passed_pawns += 1
 
         black_pawns = self.board.pieces(chess.PAWN, chess.BLACK)
         black_passed_pawns = 0
+
         for p in black_pawns:
             if self.is_passed_pawn(p, chess.BLACK):
                 black_passed_pawns += 1
@@ -773,11 +773,12 @@ class FeatureExtractorN:
         if len(piece_sqrs) == 0:
             return 0
 
-        for sqr in piece_sqrs:
+        for s in piece_sqrs:
             if color == chess.WHITE:
-                sqr_sum += PIECE_SQR_TABLES[table_name][sqr]
+                sqr_sum += PIECE_SQR_TABLES[table_name][s]
             else:
-                sqr_sum += PIECE_SQR_TABLES[table_name][mirror_square(sqr)]
+                sqr_sum += PIECE_SQR_TABLES[table_name][mirror_square(s)]
+
         return sqr_sum
 
     def piece_sqr_sum(self, piece_type) -> int:
@@ -815,13 +816,13 @@ class FeatureExtractorN:
 
     def get_features_subset_dict(self, feature_names):
         self.set_material_balances()
-        result = {}
-        for name in feature_names:
-            if name not in self.feature_functions:
-                result[name] = 0.0
+        self.result = {}
+        for n in feature_names:
+            if n not in self.feature_functions:
+                self.result[n] = 0.0
             else:
-                result[name] = self.feature_functions[name]()
-        return result
+                self.result[n] = self.feature_functions[n]()
+        return self.result
 
 def mirror_square(sq: int) -> int:
     return ((7 - (sq // 8)) * 8) + (sq % 8)

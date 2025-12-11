@@ -1,9 +1,7 @@
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Load data
 df = pd.read_csv(
     '/ann_group/positions_with_features_NEW.csv')
 
@@ -97,21 +95,13 @@ features = [
     "threat_white" # Y
 ]
 
-df = df[(df[features] == 0).sum(axis=1) <= 40]
-df = df[df['target'].abs() > 1.0]
-
-
-# Define your custom bins
 bins = [0, 20, 40, 60, float('inf')]
 labels = ["0–20", "20–40", "40–60", "60+"]
 
-df['move_bin'] = pd.cut(df['move_num'], bins=bins, labels=labels,
-                        include_lowest=True)
-
+df['move_bin'] = pd.cut(df['move_num'], bins=bins, labels=labels,include_lowest=True)
 print("ZERO PERCENTAGE PER MOVE NUMBER BIN")
 print("=" * 100)
-print(
-    f"{'Feature':<35} {'0–20':>10} {'20–40':>10} {'40–60':>10} {'60+':>10} {'Overall':>10}")
+print( f"{'Feature':<35} {'0–20':>10} {'20–40':>10} {'40–60':>10} {'60+':>10} {'Overall':>10}")
 print("-" * 100)
 
 for feat in features:
@@ -129,7 +119,6 @@ for feat in features:
     row.append(f"{overall_zero:7.1f}%")
     print(f"{feat:<35} " + " ".join(row))
 
-print("\n" + "=" * 100)
 print("POSITIONS PER BIN:")
 print(df['move_bin'].value_counts().sort_index())
-print("=" * 100)
+

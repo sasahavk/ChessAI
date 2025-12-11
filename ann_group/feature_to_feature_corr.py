@@ -31,13 +31,3 @@ plt.yticks(fontsize=9, )
 plt.tight_layout()
 plt.show()
 
-
-# features =["attack_balance","bishop_outposts","bishop_pair","bishop_sqr_sum","center_attackers","connected_pawns","defense_balance",
-#     "doubled_pawns","half_open_king_files","isolated_pawns","king_ring_enemy_pressure","king_sqr_sum","knight_outposts","knight_sqr_sum",
-#     "material_bishop","material_knight","material_pawn","material_queen","material_rook","mobility_balance","mobility_safe_balance",
-#     "passed_pawns","pawn_shield","pawn_sqr_sum","pieces_occupying_center","queen_sqr_sum","rook_sqr_sum","threat_balance"
-# ]
-# feature_labels = {"attack_balance": "abal","bishop_outposts": "bop","bishop_pair": "bbp","bishop_sqr_sum": "bss","center_attackers": "catk","connected_pawns": "cpwn","defense_balance": "dbal","doubled_pawns": "dpwn","half_open_king_files": "hogf","isolated_pawns": "ipwn","king_ring_enemy_pressure": "krep","king_sqr_sum": "kiss","knight_outposts": "kop","knight_sqr_sum": "knss",
-#     "material_bishop": "mb", "material_knight": "mk", "material_pawn": "mp", "material_queen": "mq", "material_rook": "mr", "mobility_balance": "mba", "mobility_safe_balance": "msba", "passed_pawns": "ppwn", "pawn_shield": "pwns",
-#     "pawn_sqr_sum": "pss","pieces_occupying_center": "pocc","queen_sqr_sum": "qss","rook_sqr_sum": "rss","threat_balance":"tbal",
-# }

@@ -1,0 +1,2 @@
+R2,RMSE,MSE,Best_Params
+0.8911766465521811,1.6984885789491326,2.8848634528206443,"{'activation': 'relu', 'dropout': 0.1, 'learning_rate': 0.001, 'neuron_count': 512}"

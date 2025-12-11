@@ -15,7 +15,7 @@ import numpy as np
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-df = pd.read_csv('/ann_group/positions_with_features_NEW.csv')
+df = pd.read_csv('positions_with_features_NEW.csv')
 
 
 df = df[df['target'].abs() < 90]
@@ -106,10 +106,10 @@ y_raw = df['target']
 
 
 scaler_x = StandardScaler()
-scaler_y = StandardScaler()
+# scaler_y = StandardScaler()
 
 x_scaled = scaler_x.fit_transform(x)
-y_scaled = scaler_y.fit_transform(y_raw.values.reshape(-1, 1)).ravel()
+# y_scaled = scaler_y.fit_transform(y_raw.values.reshape(-1, 1)).ravel()
 
 model = Sequential([
     Input(shape=(len(features),)),
@@ -127,28 +127,28 @@ model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
 
 early_stop = EarlyStopping(
     monitor='val_loss',
-    patience=20,
+    patience=10,
     restore_best_weights=True
 )
 
 print("Training model")
 history = model.fit(
-    x_scaled, y_scaled,
+    x_scaled, y_raw,
     validation_split=0.2,
-    epochs=100,
+    epochs=50,
     batch_size=256,
     callbacks=[early_stop],
     verbose=1
 )
 
-x_train, x_test, y_train, y_test = train_test_split(x_scaled, y_scaled, test_size=0.2, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(x_scaled, y_raw, test_size=0.2, random_state=42)
 
-y_pred_scaled = model.predict(x_test, verbose=0).ravel()
-y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
-y_test_orig = scaler_y.inverse_transform(y_test.reshape(-1, 1)).ravel()
+y_pred_scaled = model.predict(x_test, verbose=0)
+# y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
+# y_test_orig = scaler_y.inverse_transform(y_test.reshape(-1, 1)).ravel()
 
-r2 = r2_score(y_test_orig, y_pred)
-mse = mean_squared_error(y_test_orig, y_pred)
+r2 = r2_score(y_test, y_pred_scaled)
+mse = mean_squared_error(y_test, y_pred_scaled)
 rmse = np.sqrt(mse)
 
 
@@ -162,11 +162,11 @@ print(f"Stopped at epoch: {len(history.history['loss'])}")
 save_dir = 'C:/Users/sasaa/OneDrive/Documents/GOLANG/src/MyVault/NOTES/UC-Davis/F25/ECS170/ChessAI/ann_group/'
 os.makedirs(save_dir, exist_ok=True)
 
-model.save(save_dir + 'ann_model2.keras')
-
-joblib.dump(scaler_x, save_dir + 'scaler_features3.joblib')
-joblib.dump(scaler_y, save_dir + 'scaler_target3.joblib')
-joblib.dump(features, 'trained_feature_list3.joblib')
+# model.save(save_dir + 'ann_model2.keras')
+#
+# joblib.dump(scaler_x, save_dir + 'scaler_features3.joblib')
+# joblib.dump(scaler_y, save_dir + 'scaler_target3.joblib')
+# joblib.dump(features, 'trained_feature_list3.joblib')
 
 
 
@@ -174,7 +174,7 @@ results_df = pd.DataFrame({
     'Metric': ['R² Score', 'MSE', 'RMSE'],
     'Value': [round(r2, 4), round(mse, 3), round(rmse, 3)]
 })
-results_df.to_csv(save_dir + 'results_ann3.csv', index=False)
+# results_df.to_csv(save_dir + 'results_ann3.csv', index=False)
 
 
 # BASELINE
@@ -196,3 +196,9 @@ results_df.to_csv(save_dir + 'results_ann3.csv', index=False)
 # RMSE: 1.652
 # MSE:  2.729
 # Stopped at epoch: 29
+
+# FINAL RESULT
+# R²:  0.8838
+# RMSE: 1.755
+# MSE:  3.081
+# Stopped at epoch: 27

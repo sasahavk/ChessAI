@@ -103,41 +103,15 @@ features = [
 # 0.2167
 # 0.3556
 
-# count zeros per feature
-zeros = (df[features] == 0).sum().sort_values(ascending=False)
-percent_zeros = (zeros / len(df) * 100).round(1)
-
-# count near-zeros  per features (|x| < 0.01 for floats, or just 0 for ints)
-near_zeros = ((df[features].abs() < 0.01) | (df[features] == 0)).sum().sort_values(ascending=False)
-percent_near_zeros = (near_zeros / len(df) * 100).round(1)
-
-# print results
-print("FEATURE ZERO ANALYSIS (new dataset)")
-print("="*70)
-print(f"Total positions: {len(df):,}")
-print("\n% of positions where feature = exactly 0:")
-print("-"*50)
-for feat, pct in percent_zeros.items():
-    print(f"{feat:30} {pct:5.1f}%  ({zeros[feat]:,} zeros)")
-
-print("\n% of positions where feature ≈ 0 (dead/useless):")
-print("-"*60)
-for feat, pct in percent_near_zeros.items():
-    star = " ← DEAD FEATURE" if pct > 85 else ""
-    print(f"{feat:30} {pct:5.1f}%{star}")
-
-
 x = df[features]
 y_raw = df['target']
-print(df['target'].value_counts())
-print(df[features].describe())
+
 scaler_x = StandardScaler()
 scaler_y = StandardScaler()
 
 x_scaled = scaler_x.fit_transform(x)
 y_scaled = scaler_y.fit_transform(y_raw.values.reshape(-1, 1)).ravel()
 
-# Simple linear model
 linear = Ridge(alpha=1.0)
 linear.fit(x_scaled, y_scaled)
 

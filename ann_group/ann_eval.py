@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore",  message="X does not have valid feature names"
 
 
 class ann:
-    def __init__(self, stockfish_path='stockfish/stockfish-windows-x86-64-avx2.exe', model_path='ann_group/ann_model3.keras', scaler_x_path="ann_group/scaler_features3.joblib",  trained_features_path='ann_group/trained_feature_list3.joblib'):
+    def __init__(self, stockfish_path, model_path='ann_group/ann_model3.keras', scaler_x_path="ann_group/scaler_features3.joblib",  trained_features_path='ann_group/trained_feature_list3.joblib'):
         self.model = load_model(model_path)
         self.scaler_x = joblib.load(scaler_x_path)
         # self.scaler_y = joblib.load(scaler_y_path)

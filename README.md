@@ -18,5 +18,7 @@ The chess pieces may look like rectangles if the required font is not installed.
 
 ## How to Use
 The main script is "main.py."  It takes two arguments in this order:
-- `white_player`: The player who controls the white chess pieces.  Options: human, minimax, mcts, ann_minimax, stockfish  
-- `black_player`: The player who controls the black chess pieces.  Options: human, minimax, mcts, ann_minimax, stockfish
+- `white_player`: The player who controls the white chess pieces.  Options: `human`, `minimax`, `mcts`, `ann_minimax`, `stockfish` 
+- `black_player`: The player who controls the black chess pieces.  Options: `human`, `minimax`, `mcts`, `ann_minimax`, `stockfish`
+
+Example:  `python main.py human stockfish` would run the chess game with the user as white, and stockfish as black

@@ -8,12 +8,15 @@ import os
 import shutil
 import time
 from minimax_group.minimax_bot import MinimaxBot
-from minimax_group.evaluate import evaluate
-from minimax_group.minimax_new import FastMinimaxBot
-import env_variables as env
-from chess.engine import SimpleEngine, Info
+from minimax_group.evaluate import evaluate as minimax_evaluate
+# from minimax_group.minimax_new import FastMinimaxBot
+from mcts_group.mcts_bot import MonteCarloSearchTreeBot, defaultRuleForLookingAtTriedMoves
 from ann_group.ann_eval import ann
 from ann_group.feature_extractor import FeatureExtractorN
+import env_variables as env
+from chess.engine import SimpleEngine, Info
+import argparse
+
 
 TILE = 50
 WIDTH = HEIGHT = TILE * 8
@@ -44,14 +47,16 @@ PIECE_GLYPHS = {
     chess.KING:   ("K", "k"),
 }
 
+def load_stockfish(path_to_stockfish:str = None):
+    if path_to_stockfish != None:
+        return SimpleEngine.popen_uci(path_to_stockfish), path_to_stockfish
 
-def load_stockfish():
     # 1. Try system-installed Stockfish
     system_path = shutil.which("stockfish")
     if system_path:
         print("[INFO] Using system Stockfish:", system_path)
         try:
-            return SimpleEngine.popen_uci(system_path)
+            return SimpleEngine.popen_uci(system_path), system_path
         except Exception as e:
             print("[WARN] Failed to load system Stockfish:", e)
 
@@ -62,11 +67,18 @@ def load_stockfish():
     if os.path.exists(local_path):
         print("[INFO] Using bundled Stockfish:", local_path)
         try:
-            return SimpleEngine.popen_uci(local_path)
+            return SimpleEngine.popen_uci(local_path), local_path
         except Exception as e:
             print("[ERROR] Failed to launch bundled Stockfish:", e)
 
-    # 3. If everything failed
+    # 3. try to use stockfish path defined in env_variables.py
+    print("[INFO] Using Stockfish defined in env_variables.py:", env.STOCKFISH_PATH)
+    try:
+        return SimpleEngine.popen_uci(env.STOCKFISH_PATH), env.STOCKFISH_PATH
+    except Exception as e:
+        print("[WARN] Failed to load env_variables.py Stockfish:", e) 
+
+    # 4. If everything failed
     print("[ERROR] No Stockfish available. Minimax-only mode.")
     return None
 
@@ -86,13 +98,38 @@ class ChessGame:
       - "minimax": our Python Minimax
       - "stockfish": external engine (if env.STOCKFISH_PATH is set)
     """
-    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4,ann_minimax_depth=2, flip_board=False):
+    def __init__(self, white_player="human", black_player="minimax", minimax_depth=4, ann_minimax_depth=2, flip_board=False, evaluation_function=minimax_evaluate,
+        mcts_numRootSim=800, mcts_maxSimDepth=150, mcts_rememberPastBoardScores=False, mcts_lookAtTriedMovesCondition=defaultRuleForLookingAtTriedMoves
+    ):
         self.white_player = white_player
         self.black_player = black_player
-
         self.board = chess.Board()
-        self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluate)
-        self.minimax_new = FastMinimaxBot(depth=minimax_depth, eval_fn=evaluate)
+        
+        self.engine = None
+        self.stockfish_path = None
+        if self.white_player == "stockfish" or self.black_player == "stockfish":
+            self.engine, self.stockfish_path = load_stockfish(self.stockfish_path)
+
+        if self.engine:
+            try:
+                # example: set strength to ~1500 Elo
+                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
+            except Exception as e:
+                print(f"[WARN] Could not configure Stockfish options: {e}")
+
+        self.engine_analyze = None
+        if self.white_player == "stockfish" or self.black_player == "stockfish":
+            self.engine_analyze, self.stockfish_path = load_stockfish(self.stockfish_path)
+
+        self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
+        # self.minimax_new = FastMinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
+        self.mcts = MonteCarloSearchTreeBot(
+            numRootSimulations=mcts_numRootSim, maxSimDepth=mcts_maxSimDepth, evalFunc=evaluation_function,
+            rememberPastBoardScores=mcts_rememberPastBoardScores, conditionForSimulatingTriedMoves=mcts_lookAtTriedMovesCondition
+        )
+        self.ann = ann(stockfish_path=self.stockfish_path)
+        self.ann_minimax = MinimaxBot(depth=ann_minimax_depth, eval_fn=self.ann.eval)
+        
         self.flip_board = flip_board
         self.screen = None
         self.font = None
@@ -108,31 +145,22 @@ class ChessGame:
 
         self.minimax_time_total = 0.0
         self.minimax_moves = 0
-        self.minimax_new_time_total = 0.0
-        self.minimax_new_moves = 0
-
-        self.ann = ann()
-        self.ann_minimax = MinimaxBot(depth=ann_minimax_depth, eval_fn=self.ann.eval)
+        # self.minimax_new_time_total = 0.0
+        # self.minimax_new_moves = 0
 
         self.move_log: list[dict] = []
 
         self.stockfish_time_total = 0.0
         self.stockfish_moves = 0
 
-        self.engine = None
-        if self.white_player == "stockfish" or self.black_player == "stockfish":
-            self.engine = load_stockfish()
+        
 
+    def kill_stockfish(self):
         if self.engine:
-            try:
-                # example: set strength to ~1500 Elo
-                self.engine.configure({"UCI_LimitStrength": True, "UCI_Elo": STOCKFISH_ELO})
-            except Exception as e:
-                print(f"[WARN] Could not configure Stockfish options: {e}")
-
-        self.engine_analyze = None
-        if self.white_player == "stockfish" or self.black_player == "stockfish":
-            self.engine_analyze = load_stockfish()
+            self.engine.quit()
+        if self.engine_analyze:
+            self.engine_analyze.quit()
+        self.ann.fe.engine.quit()
 
     def draw_board(self):
         for r in range(8):
@@ -586,21 +614,36 @@ class ChessGame:
                 post_info=post_info,
             )
 
-    def play_minimax_new_turn(self):
+    # def play_minimax_new_turn(self):
+    #     start = time.perf_counter()
+    #     mv = self.minimax_new.play(self.board)
+    #     elapsed = time.perf_counter() - start
+
+    #     if mv:
+    #         san_str = self.board.san(mv)
+    #         self.board.push(mv)
+    #         print(f"NewMinimax played: {san_str}  (t = {elapsed:.3f}s)")
+    #         self.last_move = mv
+    #         self.last_move_squares = [mv.from_square, mv.to_square]
+
+    #         # update stats
+    #         self.minimax_new_time_total += elapsed
+    #         self.minimax_new_moves += 1
+
+    def play_mcts_turn(self):
+        color_to_move = self.board.turn  # who is about to move (for logging)
+
+        # 2) Let MCTS search
         start = time.perf_counter()
-        mv = self.minimax_new.play(self.board)
+        move, _ = self.mcts.play(self.board)
         elapsed = time.perf_counter() - start
 
-        if mv:
-            san_str = self.board.san(mv)
-            self.board.push(mv)
-            print(f"NewMinimax played: {san_str}  (t = {elapsed:.3f}s)")
-            self.last_move = mv
-            self.last_move_squares = [mv.from_square, mv.to_square]
-
-            # update stats
-            self.minimax_new_time_total += elapsed
-            self.minimax_new_moves += 1
+        if move:
+            san_str = self.board.san(move)
+            self.board.push(move)
+            print(f"MCTS played: {san_str}  (t = {elapsed:.3f}s)")
+            self.last_move = move
+            self.last_move_squares = [move.from_square, move.to_square]
 
     def play_ann_minimax_turn(self):
         start = time.perf_counter()
@@ -675,7 +718,7 @@ class ChessGame:
 
         if render:
             pygame.init()
-            pygame.display.set_caption("Chess — Human / Minimax / Stockfish")
+            pygame.display.set_caption("Chess — Human / Minimax / MCTS / ANN / Stockfish")
             self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
             self.font = pygame.font.SysFont(env.FONT_NAME, env.FONT_SIZE)
 
@@ -714,21 +757,25 @@ class ChessGame:
                 if self.board.turn == chess.WHITE and self.white_player != "human":
                     if self.white_player == "minimax":
                         self.play_minimax_turn()
-                    elif self.white_player == "new_minimax":
-                        self.play_minimax_new_turn()
-                    elif self.white_player == "stockfish":
-                        self.play_stockfish_turn()
+                    # elif self.white_player == "new_minimax":
+                    #     self.play_minimax_new_turn()
+                    elif self.white_player == "mcts":
+                        self.play_mcts_turn()
                     elif self.white_player == "ann_minimax":
                         self.play_ann_minimax_turn()
+                    elif self.white_player == "stockfish":
+                        self.play_stockfish_turn()
                 elif self.board.turn == chess.BLACK and self.black_player != "human":
                     if self.black_player == "minimax":
                         self.play_minimax_turn()
-                    elif self.black_player == "new_minimax":
-                        self.play_minimax_new_turn()
+                    # elif self.black_player == "new_minimax":
+                    #     self.play_minimax_new_turn()
+                    elif self.black_player == "mcts":
+                        self.play_mcts_turn()
+                    elif self.black_player == "ann_minimax":
+                        self.play_ann_minimax_turn()
                     elif self.black_player == "stockfish":
                         self.play_stockfish_turn()
-                    elif self.white_player == "ann_minimax":
-                        self.play_ann_minimax_turn()
 
             if render:
                 self.draw_board()
@@ -741,6 +788,8 @@ class ChessGame:
         # ----- Game over -----
         # Decide winner/label once
         # ----- Game over -----
+        self.kill_stockfish()
+
         outcome = self.board.outcome()
         if outcome and outcome.winner is not None:
             winner = "white" if outcome.winner else "black"
@@ -853,13 +902,13 @@ class ChessGame:
                 writer.writerow(out)
 
 
-def run_batch(num_games=10):
+def run_batch(white, black, num_games=10):
     for i in range(1, num_games + 1):
         print(f"\n=== Starting game {i} ===")
 
         game = ChessGame(
-            white_player="minimax",
-            black_player="stockfish",
+            white_player=white,
+            black_player=black,
             minimax_depth=5,
             flip_board=False,
         )
@@ -883,12 +932,22 @@ def run_batch(num_games=10):
 
 
 
+parser = argparse.ArgumentParser(
+    prog="Chess AI Visualizer",
+    description="Provides visuals for the chess bots playing against each other.  Also allows a human to play against them."
+)
+parser.add_argument("white_player", help="The player who controls the white chess pieces.  Options: human, minimax, mcts, ann_minimax, stockfish")
+parser.add_argument("black_player", help="The player who controls the black chess pieces.  Options: human, minimax, mcts, ann_minimax, stockfish")
 
 def main():
-    # Choose players per side: "human", "minimax", "ann_minimax", or "stockfish"
+    print("\n----------------") # separator in casee of other console output stuff
+    args = parser.parse_args()
+
+    # Choose players per side: "human", "minimax", "mcts", "ann_minimax", or "stockfish"
     # Example: Minimax (white) vs Human (black)
-    game = ChessGame(white_player="human", black_player="stockfish", minimax_depth=5)
-    run_batch(num_games=10)
+    game = ChessGame(white_player=args.white_player, black_player=args.black_player, minimax_depth=5)
+    game.play(render=True)
+    # run_batch("minimax", "stockfish", num_games=10)
 
 if __name__ == "__main__":
     main()

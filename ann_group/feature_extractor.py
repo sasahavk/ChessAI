@@ -200,7 +200,7 @@ feature_weights = {
 
 
 class FeatureExtractorN:
-    def __init__(self, board: chess.Board, game_stage: int):
+    def __init__(self, board: chess.Board, game_stage: int, stockfish_path:str):
         self.board = board
         self.feature_count = 50
         self.features = [0 for _ in range(self.feature_count)]
@@ -248,8 +248,7 @@ class FeatureExtractorN:
         self.material_extractor = mfe.MaterialFeatureExtractor(board, game_stage)
         self.pawn_extractor = kpfe.PawnFeatureExtractor(board, game_stage)
         self.king_extractor = kpfe.KingFeatureExtractor(board, game_stage)
-        self.engine = chess.engine.SimpleEngine.popen_uci(
-                    r"C:\Users\sasaa\OneDrive\Documents\GOLANG\src\MyVault\NOTES\UC-Davis\F25\ECS170\stockfish\stockfish-windows-x86-64-avx2.exe")
+        self.engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
 
     def set_board(self, board: chess.Board):
         self.board = board
@@ -828,8 +827,8 @@ def mirror_square(sq: int) -> int:
     return ((7 - (sq // 8)) * 8) + (sq % 8)
 
 
-def write_features_file(input_file='ann_group/positions.csv',output_file='ann_group/positions_with_features_NEW.csv',):
-    fe = FeatureExtractorN(chess.Board(), 0)
+def write_features_file(stockfish_path, input_file='ann_group/positions.csv',output_file='ann_group/positions_with_features_NEW.csv'):
+    fe = FeatureExtractorN(chess.Board(), 0, stockfish_path=stockfish_path)
     feature_names = list(feature_weights.keys())
     feature_names.sort()
 

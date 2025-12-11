@@ -9,7 +9,7 @@ import shutil
 import time
 from minimax_group.minimax_bot import MinimaxBot
 from minimax_group.evaluate import evaluate as minimax_evaluate
-from minimax_group.minimax_new import FastMinimaxBot
+# from minimax_group.minimax_new import FastMinimaxBot
 from mcts_group.mcts_bot import MonteCarloSearchTreeBot, defaultRuleForLookingAtTriedMoves
 from ann_group.ann_eval import ann
 from ann_group.feature_extractor import FeatureExtractorN
@@ -122,7 +122,7 @@ class ChessGame:
             self.engine_analyze, self.stockfish_path = load_stockfish(self.stockfish_path)
 
         self.minimax = MinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
-        self.minimax_new = FastMinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
+        # self.minimax_new = FastMinimaxBot(depth=minimax_depth, eval_fn=evaluation_function)
         self.mcts = MonteCarloSearchTreeBot(
             numRootSimulations=mcts_numRootSim, maxSimDepth=mcts_maxSimDepth, evalFunc=evaluation_function,
             rememberPastBoardScores=mcts_rememberPastBoardScores, conditionForSimulatingTriedMoves=mcts_lookAtTriedMovesCondition
@@ -145,8 +145,8 @@ class ChessGame:
 
         self.minimax_time_total = 0.0
         self.minimax_moves = 0
-        self.minimax_new_time_total = 0.0
-        self.minimax_new_moves = 0
+        # self.minimax_new_time_total = 0.0
+        # self.minimax_new_moves = 0
 
         self.move_log: list[dict] = []
 
@@ -614,21 +614,21 @@ class ChessGame:
                 post_info=post_info,
             )
 
-    def play_minimax_new_turn(self):
-        start = time.perf_counter()
-        mv = self.minimax_new.play(self.board)
-        elapsed = time.perf_counter() - start
+    # def play_minimax_new_turn(self):
+    #     start = time.perf_counter()
+    #     mv = self.minimax_new.play(self.board)
+    #     elapsed = time.perf_counter() - start
 
-        if mv:
-            san_str = self.board.san(mv)
-            self.board.push(mv)
-            print(f"NewMinimax played: {san_str}  (t = {elapsed:.3f}s)")
-            self.last_move = mv
-            self.last_move_squares = [mv.from_square, mv.to_square]
+    #     if mv:
+    #         san_str = self.board.san(mv)
+    #         self.board.push(mv)
+    #         print(f"NewMinimax played: {san_str}  (t = {elapsed:.3f}s)")
+    #         self.last_move = mv
+    #         self.last_move_squares = [mv.from_square, mv.to_square]
 
-            # update stats
-            self.minimax_new_time_total += elapsed
-            self.minimax_new_moves += 1
+    #         # update stats
+    #         self.minimax_new_time_total += elapsed
+    #         self.minimax_new_moves += 1
 
     def play_mcts_turn(self):
         color_to_move = self.board.turn  # who is about to move (for logging)
@@ -757,8 +757,8 @@ class ChessGame:
                 if self.board.turn == chess.WHITE and self.white_player != "human":
                     if self.white_player == "minimax":
                         self.play_minimax_turn()
-                    elif self.white_player == "new_minimax":
-                        self.play_minimax_new_turn()
+                    # elif self.white_player == "new_minimax":
+                    #     self.play_minimax_new_turn()
                     elif self.white_player == "mcts":
                         self.play_mcts_turn()
                     elif self.white_player == "ann_minimax":
@@ -768,8 +768,8 @@ class ChessGame:
                 elif self.board.turn == chess.BLACK and self.black_player != "human":
                     if self.black_player == "minimax":
                         self.play_minimax_turn()
-                    elif self.black_player == "new_minimax":
-                        self.play_minimax_new_turn()
+                    # elif self.black_player == "new_minimax":
+                    #     self.play_minimax_new_turn()
                     elif self.black_player == "mcts":
                         self.play_mcts_turn()
                     elif self.black_player == "ann_minimax":
@@ -936,8 +936,8 @@ parser = argparse.ArgumentParser(
     prog="Chess AI Visualizer",
     description="Provides visuals for the chess bots playing against each other.  Also allows a human to play against them."
 )
-parser.add_argument("white_player", help="The player who controls the white chess pieces.  Options: human, minimax, new_minimax, mcts, ann_minimax, stockfish")
-parser.add_argument("black_player", help="The player who controls the black chess pieces.  Options: human, minimax, new_minimax, mcts, ann_minimax, stockfish")
+parser.add_argument("white_player", help="The player who controls the white chess pieces.  Options: human, minimax, mcts, ann_minimax, stockfish")
+parser.add_argument("black_player", help="The player who controls the black chess pieces.  Options: human, minimax, mcts, ann_minimax, stockfish")
 
 def main():
     print("\n----------------") # separator in casee of other console output stuff

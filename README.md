@@ -1,6 +1,6 @@
 
-**Project Report:** `ECS170_FinalProject_Group11.pdf`
-**Presentation Slides:** `ECS170_Presentation_Group11.pdf`
+- **Project Report:** `ECS170_FinalProject_Group11.pdf`
+- **Presentation Slides:** `ECS170_Presentation_Group11.pdf`
 
 ## License
 

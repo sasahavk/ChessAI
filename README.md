@@ -1,3 +1,7 @@
+
+**Project Report:** `ECS170_FinalProject_Group11.pdf`
+**Presentation Slides:** `ECS170_Presentation_Group11.pdf`
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (GPLv3).
